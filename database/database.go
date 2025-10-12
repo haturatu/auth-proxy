@@ -176,7 +176,7 @@ func createTables() {
 	case "sqlite3":
 		createTokenTableSQL = `CREATE TABLE IF NOT EXISTS auth_tokens (
 			"id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-			"user_id" INTEGER NOT NULL UNIQUE,
+			"user_id" INTEGER NOT NULL,
 			"token" TEXT NOT NULL UNIQUE,
 			"expires_at" DATETIME NOT NULL,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -184,14 +184,14 @@ func createTables() {
 	case "postgres":
 		createTokenTableSQL = `CREATE TABLE IF NOT EXISTS auth_tokens (
 			id SERIAL PRIMARY KEY,
-			user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			token VARCHAR(255) NOT NULL UNIQUE,
 			expires_at TIMESTAMP WITH TIME ZONE NOT NULL
 		);`
 	case "mysql":
 		createTokenTableSQL = `CREATE TABLE IF NOT EXISTS auth_tokens (
 			id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-			user_id INT NOT NULL UNIQUE,
+			user_id INT NOT NULL,
 			token VARCHAR(255) NOT NULL UNIQUE,
 			expires_at DATETIME NOT NULL,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -210,7 +210,7 @@ func createTables() {
 	case "sqlite3":
 		createRefreshTokenTableSQL = `CREATE TABLE IF NOT EXISTS refresh_tokens (
 			"id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-			"user_id" INTEGER NOT NULL UNIQUE,
+			"user_id" INTEGER NOT NULL,
 			"token" TEXT NOT NULL UNIQUE,
 			"expires_at" DATETIME NOT NULL,
 			"is_revoked" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -219,7 +219,7 @@ func createTables() {
 	case "postgres":
 		createRefreshTokenTableSQL = `CREATE TABLE IF NOT EXISTS refresh_tokens (
 			id SERIAL PRIMARY KEY,
-			user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			token VARCHAR(255) NOT NULL UNIQUE,
 			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
 			is_revoked BOOLEAN NOT NULL DEFAULT FALSE
@@ -227,7 +227,7 @@ func createTables() {
 	case "mysql":
 		createRefreshTokenTableSQL = `CREATE TABLE IF NOT EXISTS refresh_tokens (
 			id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-			user_id INT NOT NULL UNIQUE,
+			user_id INT NOT NULL,
 			token VARCHAR(255) NOT NULL UNIQUE,
 			expires_at DATETIME NOT NULL,
 			is_revoked BOOLEAN NOT NULL DEFAULT FALSE,

@@ -33,12 +33,6 @@ func CreateAuthToken(userID int64, duration time.Duration) (*types.AuthToken, er
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// Delete existing tokens for the user
-	deleteQuery := database.Rebind("DELETE FROM auth_tokens WHERE user_id = ?")
-	if _, err := tx.Exec(deleteQuery, userID); err != nil {
-		return nil, err
-	}
-
 	// Insert the new token
 	insertQuery := database.Rebind("INSERT INTO auth_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
 	if _, err := tx.Exec(insertQuery, userID, tokenString, expiresAt); err != nil {
@@ -106,12 +100,6 @@ func CreateRefreshToken(userID int64, duration time.Duration) (*types.RefreshTok
 		return nil, err
 	}
 	defer tx.Rollback() //nolint:errcheck
-
-	// Delete existing, non-revoked refresh tokens for the user
-	deleteQuery := database.Rebind("DELETE FROM refresh_tokens WHERE user_id = ?")
-	if _, err := tx.Exec(deleteQuery, userID); err != nil {
-		return nil, err
-	}
 
 	// Insert the new refresh token
 	insertQuery := database.Rebind("INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
