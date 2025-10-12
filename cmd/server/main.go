@@ -77,13 +77,13 @@ func main() {
 
 		// For /login, GET goes to PHP, POST goes to Go's login logic
 		loginHandler := methodSwitch(loginPageHandler, http.HandlerFunc(handlers.LoginHandler))
-		mux.Handle(config.Paths.Login, loginHandler)
+		mux.Handle(config.Paths.Login, middleware.RedirectIfLoggedIn(loginHandler))
 
 		if config.Paths.RegisterEnabled {
 			// For /register, GET goes to PHP, POST goes to Go's register logic
 			registerPostHandler := middleware.RateLimitMiddleware(rateLimiter)(http.HandlerFunc(handlers.RegisterHandler))
 			registerHandler := methodSwitch(registerPageHandler, registerPostHandler)
-			mux.Handle(config.Paths.Register, registerHandler)
+			mux.Handle(config.Paths.Register, middleware.RedirectIfLoggedIn(registerHandler))
 		}
 
 		// For account pages, GET goes to PHP, POST (for password change) goes to Go
@@ -96,9 +96,10 @@ func main() {
 		mux.Handle(config.Paths.Admin, middleware.SessionAuth(middleware.AdminMiddleware(http.HandlerFunc(handlers.AdminPageHandler))))
 	} else {
 		// --- Public Auth Routes (Go templates) ---
-		mux.HandleFunc(config.Paths.Login, handlers.LoginHandler)
+		mux.Handle(config.Paths.Login, middleware.RedirectIfLoggedIn(http.HandlerFunc(handlers.LoginHandler)))
 		if config.Paths.RegisterEnabled {
-			mux.Handle(config.Paths.Register, middleware.RateLimitMiddleware(rateLimiter)(http.HandlerFunc(handlers.RegisterHandler)))
+			registerHandler := middleware.RateLimitMiddleware(rateLimiter)(http.HandlerFunc(handlers.RegisterHandler))
+			mux.Handle(config.Paths.Register, middleware.RedirectIfLoggedIn(registerHandler))
 		}
 		// --- Auth HTML pages (Protected by SessionAuth, Go templates) ---
 		mux.Handle(config.Paths.Account, middleware.SessionAuth(http.HandlerFunc(handlers.AccountPageHandler)))

@@ -60,6 +60,41 @@ func SessionAuth(next http.Handler) http.Handler {
 	})
 }
 
+// RedirectIfLoggedIn checks if a user is already logged in.
+// If a valid session exists, it redirects them to the account page.
+// This is used to prevent logged-in users from accessing public pages like login/register.
+func RedirectIfLoggedIn(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only apply this logic for GET requests to avoid interfering with form submissions
+		if r.Method != http.MethodGet {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		cookie, err := r.Cookie("auth_token")
+		// If no cookie, they are not logged in, so show the page.
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If cookie exists, validate it.
+		tokenStr := cookie.Value
+		user, err := models.GetUserByToken(tokenStr)
+
+		// If there was an error or the user/token is not found in the DB,
+		// it's an invalid token. Let them proceed to the login page
+		// where they can get a new one. The old invalid cookie will be cleared on successful login.
+		if err != nil || user == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If the user and token are valid, redirect them.
+		http.Redirect(w, r, config.Paths.Account, http.StatusFound)
+	})
+}
+
 // BearerAuth is a middleware that checks for a valid JWT Bearer token.
 // If the token is valid, it adds the user info to the context and proceeds.
 // If not, it returns a 401 Unauthorized error. Suitable for API endpoints.
