@@ -12,8 +12,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-
 )
 
 // NewRouter creates and configures the main application router.
@@ -206,4 +204,3 @@ func submitRateLimiterCleanup(pool *types.WorkerPool, limiter *types.RateLimiter
 		middleware.Cleanup(limiter)
 	})
 }
-

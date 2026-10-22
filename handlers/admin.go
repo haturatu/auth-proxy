@@ -43,8 +43,6 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
-
 // GetUsersHandler returns a list of all users with enriched information.
 // It uses a worker pool to calculate extra information for each user in parallel.
 func GetUsersHandler(w http.ResponseWriter, r *http.Request) {

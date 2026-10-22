@@ -15,13 +15,11 @@ func NewProxy(targetURL string) http.Handler {
 		panic("Invalid target URL: " + err.Error())
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	// The default director is mostly fine, but we want to log and ensure the Host header is correct.
-	director := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		director(req)          // Run the default director
-		req.Host = target.Host // Set the Host header to the target's host
+	proxy := &httputil.ReverseProxy{}
+	proxy.Rewrite = func(pr *httputil.ProxyRequest) {
+		pr.SetURL(target)
+		pr.SetXForwarded()
+		req := pr.Out
 
 		// Asynchronously log the proxying action to avoid blocking the request.
 		urlStr := req.URL.String()

@@ -9,10 +9,20 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
+	"os"
 	"time"
 )
 
-var templates = template.Must(template.ParseGlob("templates/*.html"))
+var templates = loadTemplates()
+
+func loadTemplates() *template.Template {
+	pattern := "templates/*.html"
+	// Package tests run from handlers; normal server startup runs from the root.
+	if _, err := os.Stat("templates"); errors.Is(err, os.ErrNotExist) {
+		pattern = "../templates/*.html"
+	}
+	return template.Must(template.ParseGlob(pattern))
+}
 
 // authenticateUser handles the core logic for authenticating a user, including brute-force protection.
 // It returns the authenticated user or an error if authentication fails.

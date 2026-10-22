@@ -33,9 +33,9 @@ type PathConfig struct {
 	PasswordPolicy         string
 
 	// Token Durations
-	TokenDurationHours        int
+	TokenDurationHours         int
 	AccessTokenDurationMinutes int
-	RefreshTokenDurationDays  int
+	RefreshTokenDurationDays   int
 }
 
 // ContextKey is a custom type for context keys to avoid collisions.

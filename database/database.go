@@ -250,7 +250,7 @@ func Rebind(query string) string {
 		var result strings.Builder
 		for i, part := range parts {
 			if i > 0 {
-				result.WriteString(fmt.Sprintf("$%d", i))
+				fmt.Fprintf(&result, "$%d", i)
 			}
 			result.WriteString(part)
 		}
