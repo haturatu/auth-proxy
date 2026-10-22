@@ -140,7 +140,7 @@ APIリクエストの場合、クライアントは`Authorization: Bearer <token
 
 ### 前提条件
 
-- Go 1.21 以降
+- Go 1.27.3 以降
 - (任意) PHPフロントエンドを使用する場合は、実行中のPHP-FPMサービス。
 - (任意) PostgreSQL または MySQL データベースサーバー。
 
