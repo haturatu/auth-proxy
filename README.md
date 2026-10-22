@@ -142,7 +142,7 @@
   
   ### Prerequisites
   
-  - Go 1.21 or later
+  - Go 1.27.3 or later
   - (Optional) A running PHP-FPM service if you intend to use the PHP frontend.
   - (Optional) PostgreSQL or MySQL database server.
   
