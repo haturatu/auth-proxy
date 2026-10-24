@@ -54,10 +54,11 @@ func main() {
 	}
 
 	// Create the main handler
-	mainRouter := router.NewRouter()
+	rateLimiter := middleware.NewRateLimiter()
+	mainRouter := router.NewRouter(rateLimiter)
 
 	// Start periodic background tasks
-	go router.StartBackgroundTasks(pool, middleware.NewRateLimiter())
+	go router.StartBackgroundTasks(pool, rateLimiter)
 
 	// Get server port
 	port := os.Getenv("LISTEN_PORT")
