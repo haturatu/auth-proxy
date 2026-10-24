@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -250,7 +251,7 @@ func Rebind(query string) string {
 		var result strings.Builder
 		for i, part := range parts {
 			if i > 0 {
-				result.WriteString(fmt.Sprintf("$%d", i))
+				result.WriteString("$" + strconv.Itoa(i))
 			}
 			result.WriteString(part)
 		}

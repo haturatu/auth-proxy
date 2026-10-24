@@ -12,12 +12,10 @@ import (
 	"os"
 	"strings"
 	"time"
-
-
 )
 
 // NewRouter creates and configures the main application router.
-func NewRouter() http.Handler {
+func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	targetURL := os.Getenv("TARGET_URL")
 
 	// --- Create routers for Web and API ---
@@ -30,7 +28,6 @@ func NewRouter() http.Handler {
 	webMux.Handle(assetsPath, http.StripPrefix(assetsPath, assetsFS))
 
 	// --- Rate Limiter ---
-	rateLimiter := middleware.NewRateLimiter()
 
 	// Helper to switch handler based on HTTP method
 	methodSwitch := func(get, post http.Handler) http.Handler {
@@ -163,8 +160,8 @@ func StartBackgroundTasks(pool *types.WorkerPool, limiter *types.RateLimiter) {
 	tokenTicker := time.NewTicker(1 * time.Hour)
 	defer tokenTicker.Stop()
 
-	// Ticker for rate limiter cleanup (every 24 hours)
-	rateLimiterTicker := time.NewTicker(24 * time.Hour)
+	// Ticker for rate limiter cleanup (every minute)
+	rateLimiterTicker := time.NewTicker(time.Minute)
 	defer rateLimiterTicker.Stop()
 
 	logging.AppLog.Info("Background task scheduler started")
@@ -206,4 +203,3 @@ func submitRateLimiterCleanup(pool *types.WorkerPool, limiter *types.RateLimiter
 		middleware.Cleanup(limiter)
 	})
 }
-
