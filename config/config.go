@@ -75,4 +75,3 @@ func Init() {
 		RefreshTokenDurationDays:  getEnvAsInt("REFRESH_TOKEN_DURATION_DAYS", 7),
 	}
 }
-
