@@ -70,8 +70,8 @@ func Init() {
 		PasswordPolicy:           getEnv("PASSWORD_POLICY", "standard"),
 
 		// Token Durations
-		TokenDurationHours:        getEnvAsInt("TOKEN_DURATION_HOURS", 24),
+		TokenDurationHours:         getEnvAsInt("TOKEN_DURATION_HOURS", 24),
 		AccessTokenDurationMinutes: getEnvAsInt("ACCESS_TOKEN_DURATION_MINUTES", 15),
-		RefreshTokenDurationDays:  getEnvAsInt("REFRESH_TOKEN_DURATION_DAYS", 7),
+		RefreshTokenDurationDays:   getEnvAsInt("REFRESH_TOKEN_DURATION_DAYS", 7),
 	}
 }
