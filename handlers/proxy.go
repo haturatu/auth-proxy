@@ -88,8 +88,12 @@ func NewProxy(targetURL string) http.Handler {
 			if resp.Request != nil {
 				if user, ok := resp.Request.Context().Value(types.SessionDataContextKey).(*types.User); ok && user != nil {
 					resp.Header.Set("Cache-Control", "private, no-store")
-					if !strings.Contains(strings.ToLower(resp.Header.Get("Vary")), "cookie") {
-						resp.Header.Add("Vary", "Cookie")
+					if !strings.Contains(strings.ToLower(strings.Join(resp.Header.Values("Vary"), ",")), "cookie") {
+						if existing := resp.Header.Get("Vary"); existing != "" {
+							resp.Header.Set("Vary", existing+", Cookie")
+						} else {
+							resp.Header.Set("Vary", "Cookie")
+						}
 					}
 				}
 			}
