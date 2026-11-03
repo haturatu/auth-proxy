@@ -41,7 +41,7 @@ func CreateAuthToken(userID int64, duration time.Duration) (*types.AuthToken, er
 
 	// Insert the new token
 	insertQuery := database.Rebind("INSERT INTO auth_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
-	if _, err := tx.Exec(insertQuery, userID, tokenString, expiresAt); err != nil {
+	if _, err := tx.Exec(insertQuery, userID, database.TokenHash(tokenString), expiresAt); err != nil {
 		return nil, err
 	}
 
@@ -61,7 +61,7 @@ func CreateAuthToken(userID int64, duration time.Duration) (*types.AuthToken, er
 func GetUserByToken(tokenString string) (*types.User, error) {
 	query := database.Rebind("SELECT u.id, u.username, u.password_hash, u.role, u.is_active, u.failed_logins, u.last_login_at, u.created_at, u.updated_at FROM users u JOIN auth_tokens t ON u.id = t.user_id WHERE t.token = ? AND t.expires_at > ?")
 
-	row := database.DB.QueryRow(query, tokenString, time.Now())
+	row := database.DB.QueryRow(query, database.TokenHash(tokenString), time.Now())
 
 	user := &types.User{}
 	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
@@ -78,7 +78,7 @@ func GetUserByToken(tokenString string) (*types.User, error) {
 // DeleteAuthToken deletes a token from the database.
 func DeleteAuthToken(tokenString string) error {
 	query := database.Rebind("DELETE FROM auth_tokens WHERE token = ?")
-	_, err := database.DB.Exec(query, tokenString)
+	_, err := database.DB.Exec(query, database.TokenHash(tokenString))
 	return err
 }
 
@@ -115,7 +115,7 @@ func CreateRefreshToken(userID int64, duration time.Duration) (*types.RefreshTok
 
 	// Insert the new refresh token
 	insertQuery := database.Rebind("INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
-	if _, err := tx.Exec(insertQuery, userID, tokenString, expiresAt); err != nil {
+	if _, err := tx.Exec(insertQuery, userID, database.TokenHash(tokenString), expiresAt); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +133,7 @@ func CreateRefreshToken(userID int64, duration time.Duration) (*types.RefreshTok
 // GetRefreshTokenByToken retrieves a refresh token by its token string.
 func GetRefreshTokenByToken(tokenString string) (*types.RefreshToken, error) {
 	query := database.Rebind("SELECT id, user_id, token, expires_at, is_revoked FROM refresh_tokens WHERE token = ?")
-	row := database.DB.QueryRow(query, tokenString)
+	row := database.DB.QueryRow(query, database.TokenHash(tokenString))
 
 	token := &types.RefreshToken{}
 	err := row.Scan(&token.ID, &token.UserID, &token.Token, &token.ExpiresAt, &token.IsRevoked)
@@ -143,12 +143,15 @@ func GetRefreshTokenByToken(tokenString string) (*types.RefreshToken, error) {
 		}
 		return nil, err
 	}
+	// Never expose the persisted digest to callers. Keep the presented raw token
+	// for downstream revocation/rotation operations.
+	token.Token = tokenString
 	return token, nil
 }
 
 // DeleteRefreshTokenByToken deletes a refresh token from the database by its token string.
 func DeleteRefreshTokenByToken(tokenString string) error {
 	query := database.Rebind("DELETE FROM refresh_tokens WHERE token = ?")
-	_, err := database.DB.Exec(query, tokenString)
+	_, err := database.DB.Exec(query, database.TokenHash(tokenString))
 	return err
 }

@@ -47,7 +47,7 @@ func setupBrowserSession(t *testing.T) (string, string) {
 	}
 	const session = "browser-cookie-session"
 	if _, err := database.DB.Exec("INSERT INTO auth_tokens (user_id, token, expires_at) VALUES (5, ?, ?)",
-		session, time.Now().Add(time.Hour)); err != nil {
+		database.TokenHash(session), time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	secret := make([]byte, 32)
