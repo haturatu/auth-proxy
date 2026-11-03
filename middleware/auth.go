@@ -18,6 +18,12 @@ import (
 func SessionAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := logging.GetClientIP(r)
+		// WebSocket handshakes are GET requests but must still validate
+		// Origin to prevent cross-site WebSocket hijacking.
+		if (isWebSocketUpgrade(r) || isUnsafeMethod(r.Method)) && !sameOriginRequest(r) {
+			http.Error(w, "Cross-origin session request denied", http.StatusForbidden)
+			return
+		}
 		cookie, err := r.Cookie("auth_token")
 
 		if err != nil {

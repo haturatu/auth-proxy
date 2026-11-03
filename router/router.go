@@ -89,6 +89,11 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 
 	// --- API Routes (No XSRF) ---
 	apiMux.Handle("/api/auth/token", middleware.LimitAuthBody(http.HandlerFunc(handlers.TokenHandler)))
+	if config.Paths.APIAuthMode != "bearer" {
+		// A signed token for same-origin browser API mutations. No JS token
+		// is needed for GET EventSource streams or WebSocket handshakes.
+		apiMux.Handle("/api/auth/csrf", http.HandlerFunc(middleware.SessionXSRFEndpoint))
+	}
 	apiMux.Handle("/auth/refresh", middleware.LimitAuthBody(http.HandlerFunc(handlers.RefreshTokenHandler)))
 
 	// Admin API endpoints
@@ -145,9 +150,10 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 			}
 
 			// If no specific handler is found, it's a request to be proxied.
-			// Protect it with Bearer/Cookie auth if PROTECT_API is enabled.
+			// Select explicit authentication mode for protected API paths.
+			// PROTECT_API=false would expose all upstream API traffic.
 			if config.Paths.ProtectAPI {
-				middleware.BearerAuth(proxyHandler).ServeHTTP(w, r)
+				middleware.APIAuth(config.Paths.APIAuthMode, proxyHandler).ServeHTTP(w, r)
 			} else {
 				proxyHandler.ServeHTTP(w, r)
 			}
