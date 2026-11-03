@@ -6,6 +6,7 @@ import (
 	"auth-proxy/models"
 	"auth-proxy/utils"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -48,6 +49,12 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !user.IsActive {
+		logging.SecurityLog.Warn("REFRESH TOKEN FAIL", "reason", "inactive account", "user_id", user.ID, "ip", ip)
+		http.Error(w, "Unauthorized: account inactive", http.StatusUnauthorized)
+		return
+	}
+
 	// 4. Issue a new access token
 	newAccessToken, err := utils.GenerateJWT(user, time.Duration(config.Paths.AccessTokenDurationMinutes)*time.Minute)
 	if err != nil {
@@ -56,21 +63,18 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- Optional: Token Rotation ---
-	// 5. Delete the old refresh token
-	if err := models.DeleteRefreshTokenByToken(refreshToken.Token); err != nil {
-		logging.AppLog.Error("Failed to delete old refresh token", "error", err, "ip", ip)
-		// Continue, but log the error
-	}
-
-	// 6. Issue a new refresh token
-	newRefreshToken, err := models.CreateRefreshToken(user.ID, time.Duration(config.Paths.RefreshTokenDurationDays)*24*time.Hour)
+	// Consume the supplied refresh credential exactly once and replace it in
+	// the same database transaction. Concurrent replays must not issue tokens.
+	newRefreshToken, err := models.RotateRefreshToken(reqBody.RefreshToken, user.ID, time.Duration(config.Paths.RefreshTokenDurationDays)*24*time.Hour)
 	if err != nil {
-		logging.AppLog.Error("Failed to create new refresh token", "error", err, "username", user.Username, "ip", ip)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		if errors.Is(err, models.ErrRefreshTokenSpent) {
+			http.Error(w, "Unauthorized: invalid refresh token", http.StatusUnauthorized)
+		} else {
+			logging.AppLog.Error("Failed to rotate refresh token", "error", err, "ip", ip)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
 		return
 	}
-	// --- End Token Rotation ---
 
 	// 7. Respond with new tokens
 	w.Header().Set("Content-Type", "application/json")
