@@ -92,7 +92,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	if config.Paths.APIAuthMode != "bearer" {
 		// A signed token for same-origin browser API mutations. No JS token
 		// is needed for GET EventSource streams or WebSocket handshakes.
-		apiMux.Handle("/api/auth/csrf", http.HandlerFunc(middleware.SessionXSRFEndpoint))
+		apiMux.Handle(config.Paths.APIPath+"auth/csrf", http.HandlerFunc(middleware.SessionXSRFEndpoint))
 	}
 	apiMux.Handle("/auth/refresh", middleware.LimitAuthBody(http.HandlerFunc(handlers.RefreshTokenHandler)))
 

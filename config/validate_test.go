@@ -25,15 +25,23 @@ func TestAPIAuthModeValidation(t *testing.T) {
 	t.Setenv("TARGET_URL", "http://backend:8081")
 	t.Setenv("PROTECT_API", "false")
 	t.Setenv("API_AUTH_MODE", "session")
-	if err := Validate(); err == nil { t.Fatal("session mode without PROTECT_API must be rejected") }
+	if err := Validate(); err == nil {
+		t.Fatal("session mode without PROTECT_API must be rejected")
+	}
 	t.Setenv("PROTECT_API", "true")
 	for _, mode := range []string{"bearer", "session", "either"} {
 		t.Setenv("API_AUTH_MODE", mode)
-		if err := Validate(); err != nil { t.Fatalf("%s: %v", mode, err) }
+		if err := Validate(); err != nil {
+			t.Fatalf("%s: %v", mode, err)
+		}
 	}
 	t.Setenv("API_AUTH_MODE", "invalid")
-	if err := Validate(); err == nil { t.Fatal("invalid mode accepted") }
+	if err := Validate(); err == nil {
+		t.Fatal("invalid mode accepted")
+	}
 	t.Setenv("API_AUTH_MODE", "either")
 	t.Setenv("UPSTREAM_ASSERTION_ED25519_SEED", "wrong")
-	if err := Validate(); err == nil { t.Fatal("invalid assertion seed accepted") }
+	if err := Validate(); err == nil {
+		t.Fatal("invalid assertion seed accepted")
+	}
 }

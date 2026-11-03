@@ -21,26 +21,32 @@ func TestAuthenticatedProxyRebuildsIdentityAndStripsCredentials(t *testing.T) {
 	var backendError string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		for name, want := range map[string]string{
-			"X-Username": "alice",
-			"X-User-Role": "user",
-			"X-Auth-Request-User": "alice",
-			"X-Auth-Request-Role": "user",
+			"X-Username":             "alice",
+			"X-User-Role":            "user",
+			"X-Auth-Request-User":    "alice",
+			"X-Auth-Request-Role":    "user",
 			"X-Auth-Request-User-Id": "42",
-			"Cookie": "theme=dark",
+			"Cookie":                 "theme=dark",
 		} {
 			if got := r.Header.Get(name); got != want {
 				backendError += name + "=" + got + " expected " + want + "; "
 			}
 		}
-		if got := r.Header.Get("Authorization"); got != "" { backendError += "Authorization leaked; " }
-		if got := r.Header.Get("X-Forwarded-User"); got != "" { backendError += "X-Forwarded-User spoofed; " }
+		if got := r.Header.Get("Authorization"); got != "" {
+			backendError += "Authorization leaked; "
+		}
+		if got := r.Header.Get("X-Forwarded-User"); got != "" {
+			backendError += "X-Forwarded-User spoofed; "
+		}
 		token := r.Header.Get("X-Auth-Request-JWT")
 		parts := strings.Split(token, ".")
 		if len(parts) != 3 {
 			backendError += "missing assertion; "
 		} else {
 			key, err := utils.UpstreamAssertionPublicKey()
-			if err != nil { backendError += "invalid assertion key; " }
+			if err != nil {
+				backendError += "invalid assertion key; "
+			}
 			signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 			if err != nil || !ed25519.Verify(key, []byte(parts[0]+"."+parts[1]), signature) {
 				backendError += "assertion signature invalid; "
@@ -63,8 +69,16 @@ func TestAuthenticatedProxyRebuildsIdentityAndStripsCredentials(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), types.SessionDataContextKey, user))
 	rr := httptest.NewRecorder()
 	NewProxy(upstream.URL).ServeHTTP(rr, req)
-	if rr.Code != 204 { t.Fatalf("proxy returned %d %s", rr.Code, rr.Body.String()) }
-	if backendError != "" { t.Fatal(backendError) }
-	if got := rr.Header().Get("Cache-Control"); got != "private, no-store" { t.Fatalf("Cache-Control = %q", got) }
-	if !strings.Contains(rr.Header().Get("Vary"), "Cookie") { t.Fatal("Vary missing Cookie") }
+	if rr.Code != 204 {
+		t.Fatalf("proxy returned %d %s", rr.Code, rr.Body.String())
+	}
+	if backendError != "" {
+		t.Fatal(backendError)
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "private, no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+	if !strings.Contains(rr.Header().Get("Vary"), "Cookie") {
+		t.Fatal("Vary missing Cookie")
+	}
 }

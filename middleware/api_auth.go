@@ -138,8 +138,12 @@ func sameOriginURL(r *http.Request, raw string) bool {
 		return false
 	}
 	normalizePort := func(port, scheme string) string {
-		if port != "" { return port }
-		if scheme == "https" { return "443" }
+		if port != "" {
+			return port
+		}
+		if scheme == "https" {
+			return "443"
+		}
 		return "80"
 	}
 	return normalizePort(u.Port(), scheme) == normalizePort(expected.Port(), scheme)
