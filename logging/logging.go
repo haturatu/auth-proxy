@@ -49,7 +49,12 @@ func ConfigureTrustedProxies(raw string) error {
 			}
 			prefix = netip.PrefixFrom(ip, ip.BitLen())
 		}
-		prefixes = append(prefixes, prefix.Masked())
+		prefix = prefix.Masked()
+		// Trusting every remote address defeats the security boundary.
+		if prefix.Bits() == 0 {
+			return fmt.Errorf("wildcard TRUSTED_PROXY_CIDRS %q is unsafe; specify immediate proxies only", entry)
+		}
+		prefixes = append(prefixes, prefix)
 	}
 	proxyMu.Lock()
 	trustedProxies = prefixes
@@ -84,17 +89,35 @@ func GetClientIP(r *http.Request) string {
 	if !ok {
 		return r.RemoteAddr
 	}
+	if !isTrusted(peer) {
+		return peer.String()
+	}
+	// Limit both bytes and hops before parsing to keep attacker-supplied
+	// forwarding chains bounded even when the immediate proxy is trusted.
+	values := r.Header.Values("X-Forwarded-For")
+	if len(values) == 0 {
+		return peer.String()
+	}
+	joined := strings.Join(values, ",")
+	if len(joined) > 4096 {
+		return peer.String()
+	}
+	chain := strings.Split(joined, ",")
+	if len(chain) > 32 {
+		return peer.String()
+	}
 	current := peer
-	if isTrusted(peer) {
-		forwarded := r.Header.Values("X-Forwarded-For")
-		chain := strings.Split(strings.Join(forwarded, ","), ",")
-		for i := len(chain) - 1; i >= 0 && isTrusted(current); i-- {
-			next, err := netip.ParseAddr(strings.TrimSpace(chain[i]))
-			if err != nil {
-				break
-			}
-			current = next.Unmap()
+	for i := len(chain) - 1; i >= 0 && isTrusted(current); i-- {
+		next, err := netip.ParseAddr(strings.TrimSpace(chain[i]))
+		if err != nil {
+			return peer.String()
 		}
+		current = next.Unmap()
+	}
+	// If every hop in the chain claims to be trusted, there is no
+	// verifiable untrusted source. Use the observed peer instead.
+	if isTrusted(current) {
+		return peer.String()
 	}
 	return current.String()
 }
