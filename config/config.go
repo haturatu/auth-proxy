@@ -68,6 +68,8 @@ func Init() {
 
 		// Security Policies
 		MaxLoginAttempts:       getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+		AuthRateLimitMaxRequests: getEnvAsInt("AUTH_RATE_LIMIT_MAX_REQUESTS", 20),
+		AuthRateLimitWindowSeconds: getEnvAsInt("AUTH_RATE_LIMIT_WINDOW_SECONDS", 300),
 		LockoutDurationMinutes: getEnvAsInt("LOCKOUT_DURATION_MINUTES", 10),
 		RateLimitMaxRequests:   getEnvAsInt("USER_CREATION_RATE_LIMIT_MAX_REQUESTS", 5),
 		RateLimitWindowSeconds: getEnvAsInt("USER_CREATION_RATE_LIMIT_WINDOW_SECONDS", 3600),
