@@ -162,9 +162,9 @@ func createTables() {
 	// Add a separate temporary login lock. Keep is_active exclusively for
 	// administrator disablement. This is safe for existing databases on all drivers.
 	lockColumn := map[string]string{
-		"sqlite3": "DATETIME",
+		"sqlite3":  "DATETIME",
 		"postgres": "TIMESTAMP WITH TIME ZONE",
-		"mysql": "DATETIME",
+		"mysql":    "DATETIME",
 	}[dbType]
 	rows, err := DB.Query("SELECT locked_until FROM users LIMIT 0")
 	if err == nil {

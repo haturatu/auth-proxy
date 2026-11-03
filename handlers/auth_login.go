@@ -143,8 +143,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			// Map authentication error to user-facing message
 			errMsg := "Invalid username or password."
 			if err.Error() == "account is disabled" {
-                errMsg = "Account is disabled. Contact the administrator."
-            } else if err.Error() == "account is temporarily locked" {
+				errMsg = "Account is disabled. Contact the administrator."
+			} else if err.Error() == "account is temporarily locked" {
 				errMsg = "Account is temporarily locked."
 			} else if err.Error() == "internal server error" {
 				errMsg = "An internal error occurred. Please try again."

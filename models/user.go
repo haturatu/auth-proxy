@@ -13,7 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-    "time"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -177,16 +177,16 @@ func SetUserActiveStatus(id int64, isActive bool) error {
 	return err
 }
 
- // SetLoginLock sets a temporary lock without changing the administrator-controlled active flag.
+// SetLoginLock sets a temporary lock without changing the administrator-controlled active flag.
 func SetLoginLock(id int64, until time.Time) error {
-    query := database.Rebind("UPDATE users SET locked_until = ?, failed_logins = 0 WHERE id = ?")
-    _, err := database.DB.Exec(query, until, id)
-    return err
+	query := database.Rebind("UPDATE users SET locked_until = ?, failed_logins = 0 WHERE id = ?")
+	_, err := database.DB.Exec(query, until, id)
+	return err
 }
 
 // ClearExpiredLoginLock resets failed attempts after the configured lock expires.
 func ClearExpiredLoginLock(id int64, now time.Time) error {
-    query := database.Rebind("UPDATE users SET locked_until = NULL, failed_logins = 0 WHERE id = ? AND locked_until <= ?")
-    _, err := database.DB.Exec(query, id, now)
-    return err
+	query := database.Rebind("UPDATE users SET locked_until = NULL, failed_logins = 0 WHERE id = ? AND locked_until <= ?")
+	_, err := database.DB.Exec(query, id, now)
+	return err
 }
