@@ -151,9 +151,22 @@ func DeleteUser(id int64) error {
 
 // UpdateUserPassword updates a user's password hash
 func UpdateUserPassword(id int64, passwordHash string) error {
-	query := database.Rebind("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-	_, err := database.DB.Exec(query, passwordHash, id)
-	return err
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	update := database.Rebind("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+	if _, err := tx.Exec(update, passwordHash, id); err != nil {
+		return err
+	}
+	for _, table := range []string{"auth_tokens", "refresh_tokens"} {
+		revoke := database.Rebind("DELETE FROM " + table + " WHERE user_id = ?")
+		if _, err := tx.Exec(revoke, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // RecordLoginSuccess resets failed login attempts and updates last login time
