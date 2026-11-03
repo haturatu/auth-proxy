@@ -94,10 +94,10 @@ type RateLimiter struct {
 
 // WorkerPool manages a pool of goroutines to execute tasks concurrently.
 type WorkerPool struct {
-	Workers    int
-	TaskQueue  chan func()
-	Wg         sync.WaitGroup
-	Active     int64
+	Workers   int
+	TaskQueue chan func()
+	Wg        sync.WaitGroup
+	Active    int64
 }
 
 // EnrichedUser is a wrapper for User with additional computed fields for admin views.

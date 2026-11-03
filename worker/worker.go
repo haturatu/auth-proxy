@@ -18,9 +18,9 @@ func NewWorkerPool() *types.WorkerPool {
 	}
 
 	pool := &types.WorkerPool{
-		Workers:    numWorkers,
-		TaskQueue:  make(chan func(), numWorkers*2),
-		Active:     0,
+		Workers:   numWorkers,
+		TaskQueue: make(chan func(), numWorkers*2),
+		Active:    0,
 	}
 
 	for i := 0; i < numWorkers; i++ {
