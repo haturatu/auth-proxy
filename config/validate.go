@@ -28,6 +28,41 @@ func Validate() error {
 	if err != nil || target.Host == "" || (target.Scheme != "http" && target.Scheme != "https") || target.User != nil {
 		return fmt.Errorf("TARGET_URL must be an absolute http(s) URL without userinfo")
 	}
+	apiPath := getEnv("API_PATH", "/api/")
+	if !strings.HasPrefix(apiPath, "/") || !strings.HasSuffix(apiPath, "/") || apiPath == "/" ||
+		strings.Contains(apiPath, "//") || strings.ContainsAny(apiPath, "?#%") || strings.Contains(apiPath, "..") {
+		return fmt.Errorf("API_PATH must be an absolute non-root URL prefix ending in /")
+	}
+	paths := []struct{ key, value string }{
+		{"AUTH_PATH_LOGIN", getEnv("AUTH_PATH_LOGIN", "/login")},
+		{"AUTH_PATH_REGISTER", getEnv("AUTH_PATH_REGISTER", "/register")},
+		{"AUTH_PATH_LOGOUT", getEnv("AUTH_PATH_LOGOUT", "/logout")},
+		{"AUTH_PATH_ACCOUNT", getEnv("AUTH_PATH_ACCOUNT", "/account")},
+		{"AUTH_PATH_ACCOUNT_PASSWORD", getEnv("AUTH_PATH_ACCOUNT_PASSWORD", "/account/password")},
+		{"AUTH_PATH_ADMIN", getEnv("AUTH_PATH_ADMIN", "/admin")},
+		{"AUTH_PATH_ADMIN_USERS_API", getEnv("AUTH_PATH_ADMIN_USERS_API", "/api/admin/users")},
+		{"AUTH_ASSETS_PATH", getEnv("AUTH_ASSETS_PATH", "/assets")},
+	}
+	seen := make(map[string]string, len(paths))
+	for _, entry := range paths {
+		p := entry.value
+		if p == "" || !strings.HasPrefix(p, "/") || p == "/" ||
+			strings.ContainsAny(p, "?#%") || strings.Contains(p, "//") || strings.Contains(p, "..") {
+			return fmt.Errorf("%s must be an absolute, canonical non-root path", entry.key)
+		}
+		if other, found := seen[p]; found {
+			return fmt.Errorf("%s conflicts with %s at %s", entry.key, other, p)
+		}
+		seen[p] = entry.key
+		if entry.key != "AUTH_PATH_ADMIN_USERS_API" &&
+			(strings.TrimSuffix(apiPath, "/") == p || strings.HasPrefix(p, apiPath)) {
+			return fmt.Errorf("%s must not be inside API_PATH", entry.key)
+		}
+		if p == "/api/auth/token" || p == "/auth/refresh" {
+			return fmt.Errorf("%s conflicts with a reserved authentication endpoint", entry.key)
+		}
+	}
+
 	mode := os.Getenv("API_AUTH_MODE")
 	switch mode {
 	case "", "bearer":
