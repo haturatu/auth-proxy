@@ -13,6 +13,11 @@ import (
 
 // RefreshTokenHandler handles exchanging a valid refresh token for a new access token.
 func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	ip := logging.GetClientIP(r)
 
 	// 1. Parse request body
@@ -35,7 +40,17 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	if refreshToken == nil || refreshToken.IsRevoked || time.Now().After(refreshToken.ExpiresAt) {
+	if refreshToken == nil || time.Now().After(refreshToken.ExpiresAt) {
+		// A previously consumed credential is evidence of possible replay;
+		// revoke the active refresh credential in that family. Unknown tokens
+		// do not invalidate accounts.
+		if refreshToken == nil {
+			if _, err := models.RevokeOnRefreshReplay(reqBody.RefreshToken); err != nil {
+				logging.AppLog.Error("Refresh replay check failed", "error", err, "ip", ip)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+		}
 		logging.SecurityLog.Warn("REFRESH TOKEN FAIL", "reason", "token not found, revoked, or expired", "ip", ip)
 		http.Error(w, "Unauthorized: Invalid refresh token", http.StatusUnauthorized)
 		return
@@ -68,6 +83,11 @@ func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	newRefreshToken, err := models.RotateRefreshToken(reqBody.RefreshToken, user.ID, time.Duration(config.Paths.RefreshTokenDurationDays)*24*time.Hour)
 	if err != nil {
 		if errors.Is(err, models.ErrRefreshTokenSpent) {
+			if _, revokeErr := models.RevokeOnRefreshReplay(reqBody.RefreshToken); revokeErr != nil {
+				logging.AppLog.Error("Refresh replay revocation failed", "error", revokeErr, "ip", ip)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
 			http.Error(w, "Unauthorized: invalid refresh token", http.StatusUnauthorized)
 		} else {
 			logging.AppLog.Error("Failed to rotate refresh token", "error", err, "ip", ip)
