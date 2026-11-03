@@ -57,5 +57,4 @@ func ActiveWorkers(p *types.WorkerPool) int64 {
 func Close(p *types.WorkerPool) {
 	close(p.TaskQueue)
 	p.Wg.Wait()
-	close(p.ResultChan)
 }
