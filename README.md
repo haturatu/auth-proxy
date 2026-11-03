@@ -210,7 +210,6 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   # If true, protects the API path with bearer token authentication
   PROTECT_API=false
   # Base path for frontend routes to be protected
-  FRONT_PATH=/
   # Base path for API routes to be protected
   API_PATH=/api/
   
@@ -539,7 +538,6 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   | `REFRESH_TOKEN_DURATION_DAYS` | The duration in days for a JWT refresh token for API clients. | `7` |
   | `PROTECT_FRONTEND` | If `true`, proxies all frontend paths through session authentication. | `false` |
   | `PROTECT_API` | If `true`, proxies all API paths through bearer token authentication. | `false` |
-  | `FRONT_PATH` | The base path for frontend routes to be protected by `PROTECT_FRONTEND`. | `/` |
   | `API_PATH` | The base path for API routes to be protected by `PROTECT_API`. | `/api/` |
   | `REGISTER` | If set to `false`, disables new user registration. | `true` |
   | `AUTH_PATH_*` | A set of variables to customize the internal URLs for login, admin, etc. | Various, e.g., `/login`|
