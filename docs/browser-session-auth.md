@@ -23,7 +23,9 @@ When the browser opens `http://192.168.10.5:8080` from another VLAN (`192.168.20
 
 The session cookie is sent automatically on same-origin `fetch('/api/...')`, `new EventSource('/api/events')`, WebSocket handshakes, and normal HTML subresource requests. Native EventSource and browser WebSocket do not provide generic arbitrary Authorization header options. Use same-origin browser APIs instead of putting tokens in query parameters.
 
-Read-only GET/HEAD requests require a valid session but **not** an XSRF token. Unsafe methods (POST, PUT, PATCH, DELETE, etc.) additionally require a signed XSRF token bound to that session and the configured API scope. Fetch it with:
+Read-only GET/HEAD requests require a valid session but **not** an XSRF token. Unsafe methods (POST, PUT, PATCH, DELETE, etc.) are protected by browser-verified same-origin signals by default (`API_SESSION_CSRF=origin`). This keeps existing SPAs working without JavaScript changes, because browsers send `Sec-Fetch-Site`/`Origin` and cross-site requests are rejected.
+
+For deployments that can update the client, set `API_SESSION_CSRF=xsrf` to additionally require a signed, session-bound XSRF token on unsafe requests. Fetch it with:
 
 ```js
 const { xsrf_token } = await fetch('/api/auth/csrf', {

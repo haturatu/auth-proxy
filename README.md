@@ -135,7 +135,7 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   
   For API requests, the client must include the JWT Access Token in the `Authorization: Bearer <token>` header. A middleware on the server validates the token's signature and expiration time. This process is stateless, meaning it does not require a database lookup for every request, making it highly efficient. If the access token has expired, the client can use the refresh token to request a new access token without re-authenticating.
   
-  **Authentication:** With `PROTECT_API=true`, `API_AUTH_MODE=bearer` requires a JWT (default). Set `session` for cookie-authenticated browser APIs (including EventSource/WebSocket), or `either` to accept Bearer and session cookies with strict same-origin/CSRF checks. See [Browser API authentication](docs/browser-session-auth.md).
+  **Authentication:** With `PROTECT_API=true`, `API_AUTH_MODE=bearer` requires a JWT (default). Set `session` for cookie-authenticated browser APIs (including EventSource/WebSocket), or `either` to accept Bearer and session cookies. Cookie requests are same-origin checked; `API_SESSION_CSRF=origin` (default) keeps existing SPAs working, while `xsrf` additionally requires `/api/auth/csrf`. See [Browser API authentication](docs/browser-session-auth.md).
   
   ### Transport Layer Security (HTTPS)
   

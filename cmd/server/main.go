@@ -27,6 +27,11 @@ func main() {
 		logging.AppLog.Error("Invalid configuration", "error", err)
 		os.Exit(1)
 	}
+	logging.AppLog.Info("Authentication plane configured",
+		"protect_frontend", config.Paths.ProtectFrontend,
+		"protect_api", config.Paths.ProtectAPI,
+		"api_auth_mode", config.Paths.APIAuthMode,
+	)
 
 	// Only honor forwarded headers from explicitly configured proxy peers.
 	// Direct clients on another VLAN require no trusted CIDR.

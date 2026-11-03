@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // Validate fails closed before opening a database or starting the HTTP server.
@@ -29,6 +30,11 @@ func Validate() error {
 		}
 	default:
 		return fmt.Errorf("API_AUTH_MODE must be bearer, session, or either")
+	}
+	switch strings.ToLower(os.Getenv("API_SESSION_CSRF")) {
+	case "", "origin", "xsrf":
+	default:
+		return fmt.Errorf("API_SESSION_CSRF must be origin or xsrf")
 	}
 	if os.Getenv("UPSTREAM_ASSERTION_AS_BEARER") == "true" &&
 		os.Getenv("UPSTREAM_ASSERTION_ED25519_SEED") == "" {

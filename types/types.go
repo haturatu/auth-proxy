@@ -20,6 +20,7 @@ type PathConfig struct {
 	FrontPath       string
 	APIPath         string
 	APIAuthMode     string
+	APISessionCSRF  string
 
 	// Booleans
 	CookieSecure    bool

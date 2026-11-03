@@ -46,7 +46,12 @@ func SessionAPIAuth(next http.Handler) http.Handler {
 			writeAPIError(w, r, http.StatusForbidden, "cross-origin session request denied")
 			return
 		}
-		if isUnsafeMethod(r.Method) && !ValidateSessionXSRF(r, config.Paths.APIPath) {
+		// origin mode already requires a browser-verified same-origin
+		// Sec-Fetch-Site/Origin/Referer on unsafe requests. xsrf mode adds a
+		// session-bound token for deployments that can update the client.
+		if isUnsafeMethod(r.Method) &&
+			config.Paths.APISessionCSRF == "xsrf" &&
+			!ValidateSessionXSRF(r, config.Paths.APIPath) {
 			writeAPIError(w, r, http.StatusForbidden, "CSRF token required")
 			return
 		}

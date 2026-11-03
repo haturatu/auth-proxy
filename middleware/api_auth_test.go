@@ -59,6 +59,7 @@ func setupBrowserSession(t *testing.T) (string, string) {
 	oldPaths := config.Paths
 	config.Paths.APIPath = "/api/"
 	config.Paths.Login = "/login"
+	config.Paths.APISessionCSRF = "xsrf"
 	t.Cleanup(func() { config.Paths = oldPaths })
 	return session, xsrftoken.Generate(string(secret), "auth:"+session, "/api/")
 }
@@ -104,6 +105,33 @@ func TestSessionAPIOriginAndCSRF(t *testing.T) {
 	check("POST", "http://evil.example", "cross-site", "", token, 403)
 	check("POST", "", "", "", token, 403)
 	check("GET", "", "same-origin", "Bearer invalid", "", 401)
+}
+
+func TestSessionAPIOriginModeAllowsSameOriginMutation(t *testing.T) {
+	session, _ := setupBrowserSession(t)
+	config.Paths.APISessionCSRF = "origin"
+	h := SessionAPIAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "http://192.168.10.5:8080/api/files", nil)
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: session})
+	req.Header.Set("Origin", "http://192.168.10.5:8080")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("same-origin POST without XSRF in origin mode: got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	cross := httptest.NewRequest(http.MethodPost, "http://192.168.10.5:8080/api/files", nil)
+	cross.AddCookie(&http.Cookie{Name: "auth_token", Value: session})
+	cross.Header.Set("Origin", "http://evil.example")
+	cross.Header.Set("Sec-Fetch-Site", "cross-site")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, cross)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("cross-site POST in origin mode: got %d", rec.Code)
+	}
 }
 
 func TestAPIAuthModeSelection(t *testing.T) {
