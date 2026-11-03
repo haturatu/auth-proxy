@@ -185,7 +185,7 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   
   # A long, random string for securing session cookies and JWTs
   # For production, generate a new key using: openssl rand -base64 45
-  SESSION_SECRET=my-super-secret-key
+  SESSION_SECRET= # Generate with: openssl rand -base64 48
   
   # (Required) A 32-byte random key for XSRF protection.
   # Generate with: openssl rand -base64 32
@@ -552,3 +552,5 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   
   ```
   
+
+> Never copy a fixed `SESSION_SECRET` from documentation into a live deployment. Generate a unique secret with `openssl rand -base64 48` and set it in `.env` or your secrets manager. Startup refuses secrets shorter than 32 bytes.
