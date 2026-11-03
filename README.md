@@ -552,3 +552,7 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   
 
 > Never copy a fixed `SESSION_SECRET` from documentation into a live deployment. Generate a unique secret with `openssl rand -base64 48` and set it in `.env` or your secrets manager. Startup refuses secrets shorter than 32 bytes.
+
+### Password-change credential revocation
+
+After a successful password change, all stored browser sessions and refresh tokens for that user are revoked atomically with the password update. The caller's session cookie is cleared. Access JWTs are bound to the current password credential state and become invalid on the next authenticated request. Older JWTs lacking `cv` are intentionally rejected; clients must sign in again.
