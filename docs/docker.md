@@ -63,3 +63,7 @@ docker compose down
 `GET /healthz` checks DB availability; block public access at the front proxy if unnecessary. The app runs as an unprivileged user.
 
 **WARNING:** `docker compose down -v` deletes stored database data. Switching the selected DB does **not** migrate users, tokens or sessions; back up and migrate explicitly. The existing table creation logic is not a full schema migration system.
+
+## Username collation
+
+New and existing MySQL/MariaDB databases use `utf8mb4_bin` for the `users.username` unique column so `Admin` and `admin` are distinct, as in the default SQLite/PostgreSQL configurations. The startup migration checks the old collation and changes it if necessary; the ALTER can lock a large table, so schedule rollout accordingly. The application does not perform Unicode NFC/NFD normalization; restrict visually confusable identifiers via local registration policy if that matters for your deployment. MySQL/MariaDB trailing-space collation semantics may still differ, so avoid usernames containing trailing spaces.

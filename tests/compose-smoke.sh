@@ -32,6 +32,9 @@ for attempt in $(seq 1 60); do
 done
 curl --fail --silent http://127.0.0.1:18080/healthz >/dev/null
 printf '%s\n' 'correct-horse-battery-staple-123' | compose exec -T auth-proxy /app/admin-cli --username smoke-admin --password-stdin
+# Distinct-case accounts must remain distinct in every database backend.
+printf '%s\n' 'correct-horse-battery-staple-123' | compose exec -T auth-proxy /app/admin-cli --username SmokeCase --password-stdin
+printf '%s\n' 'correct-horse-battery-staple-123' | compose exec -T auth-proxy /app/admin-cli --username smokecase --password-stdin
 response="$(curl --fail --silent -H 'Content-Type: application/json' -d '{"username":"smoke-admin","password":"correct-horse-battery-staple-123"}' http://127.0.0.1:18080/api/auth/token)"
 echo "$response" | grep -q '"access_token"'
 echo "$response" | grep -q '"refresh_token"'
