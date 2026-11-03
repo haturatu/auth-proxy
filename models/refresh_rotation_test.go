@@ -18,8 +18,13 @@ func TestRotateRefreshTokenConsumesExactlyOnce(t *testing.T) {
 	db.SetMaxOpenConns(1)
 	database.DB = db
 	defer func() { database.DB = old; _ = db.Close() }()
-	if _, err := db.Exec("CREATE TABLE refresh_tokens (id INTEGER PRIMARY KEY, user_id INTEGER UNIQUE, token TEXT UNIQUE, expires_at DATETIME, is_revoked BOOLEAN DEFAULT FALSE)"); err != nil {
-		t.Fatal(err)
+	for _, stmt := range []string{
+		"CREATE TABLE refresh_tokens (id INTEGER PRIMARY KEY, user_id INTEGER UNIQUE, token TEXT UNIQUE, expires_at DATETIME)",
+		"CREATE TABLE consumed_refresh_tokens (token_hash TEXT PRIMARY KEY, user_id INTEGER, expires_at DATETIME, consumed_at DATETIME)",
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
 	}
 	oldToken, err := CreateRefreshToken(1, time.Hour)
 	if err != nil {

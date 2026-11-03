@@ -75,7 +75,6 @@ type RefreshToken struct {
 	UserID    int64
 	Token     string
 	ExpiresAt time.Time
-	IsRevoked bool
 }
 
 // JWTPayload defines the claims for the access token.
