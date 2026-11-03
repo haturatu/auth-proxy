@@ -22,7 +22,6 @@ type PathConfig struct {
 	APISessionCSRF  string
 
 	// Booleans
-	CookieSecure    bool
 	ProtectFrontend bool
 	ProtectAPI      bool
 	RegisterEnabled bool

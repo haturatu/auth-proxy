@@ -10,6 +10,13 @@ import (
 
 // Validate fails closed before opening a database or starting the HTTP server.
 func Validate() error {
+	// CookieSecure() is the single source of truth for evaluating this setting.
+	// Reject typos here rather than silently downgrading secure-cookie behavior.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("COOKIE_SECURE"))) {
+	case "", "true", "always", "false", "never", "auto":
+	default:
+		return fmt.Errorf("COOKIE_SECURE must be true, false, or auto")
+	}
 	if len(os.Getenv("SESSION_SECRET")) < 32 {
 		return fmt.Errorf("SESSION_SECRET must contain at least 32 characters")
 	}
