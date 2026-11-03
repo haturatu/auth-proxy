@@ -206,9 +206,9 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   # Frontend mode: "js" (default) or "php"
   FRONTEND_TYPE=js
   # If true, protects the frontend path with session authentication
-  PROTECT_FRONTEND=false
+  PROTECT_FRONTEND=true
   # If true, protects the API path with bearer token authentication
-  PROTECT_API=false
+  PROTECT_API=true
   # Base path for frontend routes to be protected
   # Base path for API routes to be protected
   API_PATH=/api/

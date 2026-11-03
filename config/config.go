@@ -60,8 +60,8 @@ func Init() {
 		APISessionCSRF:  strings.ToLower(strings.TrimSpace(getEnv("API_SESSION_CSRF", "origin"))),
 
 		// Booleans
-		ProtectFrontend: getEnvAsBool("PROTECT_FRONTEND", false),
-		ProtectAPI:      getEnvAsBool("PROTECT_API", false),
+		ProtectFrontend: getEnvAsBool("PROTECT_FRONTEND", true),
+		ProtectAPI:      getEnvAsBool("PROTECT_API", true),
 		RegisterEnabled: getEnvAsBool("REGISTER", true),
 
 		// Security Policies

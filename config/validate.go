@@ -67,7 +67,7 @@ func Validate() error {
 	switch mode {
 	case "", "bearer":
 	case "session", "either":
-		if !getEnvAsBool("PROTECT_API", false) {
+		if !getEnvAsBool("PROTECT_API", true) {
 			return fmt.Errorf("PROTECT_API=true is required for API_AUTH_MODE=%s", mode)
 		}
 	default:
