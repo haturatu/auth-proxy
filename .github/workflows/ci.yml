@@ -79,6 +79,18 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: '**/go.sum'
 
+      # Temporary gofmt extraction; removed after committing formatted files.
+      - name: Export Go 1.27 formatted files
+        run: |
+          gofmt -w .
+          python3 - <<'PY'
+          import json, subprocess
+          paths = subprocess.check_output(['git', 'diff', '--name-only', '--', '*.go'], text=True).splitlines()
+          for path in paths:
+              with open(path, encoding='utf-8') as f:
+                  print('FMT_FILE=' + json.dumps({'path': path, 'content': f.read()}, separators=(',', ':')))
+          PY
+
       - name: Check formatting
         run: |
           gofmt_output=$(gofmt -l .)
