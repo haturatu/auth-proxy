@@ -1,0 +1,32 @@
+name: One-time credential regression fix/issue-8-atomic-refresh-rotation
+
+on:
+  push:
+    branches:
+      - 'fix/issue-8-atomic-refresh-rotation'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify credential and regression tests
+        run: go test ./...
+      - name: Remove one-time verifier after success
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-verify.yml
+          git commit -m "test: verified Go tests and removed temporary workflow"
+          git push origin HEAD:fix/issue-8-atomic-refresh-rotation
