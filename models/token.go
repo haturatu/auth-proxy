@@ -143,6 +143,9 @@ func GetRefreshTokenByToken(tokenString string) (*types.RefreshToken, error) {
 		}
 		return nil, err
 	}
+	// Never expose the persisted digest to callers. Keep the presented raw token
+	// for downstream revocation/rotation operations.
+	token.Token = tokenString
 	return token, nil
 }
 
