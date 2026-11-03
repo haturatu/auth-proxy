@@ -40,6 +40,15 @@ func isUnsafeMethod(method string) bool {
 	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
 }
 
+// Keep xsrftoken even when using Go 1.25+ http.CrossOriginProtection.
+// CrossOriginProtection checks cross-origin signals (Sec-Fetch-Site / Origin),
+// but it does NOT mint or validate a per-session CSRF token. In particular,
+// requests without these browser headers (e.g. older clients or scripts) can
+// pass its origin check. xsrftoken independently binds unsafe form submissions
+// to the caller's session (anonymous or authenticated), the requested action,
+// and a 15-minute expiration. These are complementary defenses, not duplicates.
+// A browser on another home VLAN accessing http://192.168.x.x:8080 at the same
+// origin is still allowed without trusting the source IP address.
 func verifyXSRF(r *http.Request, scope string, secret []byte) bool {
 	sid := sessionID(r)
 	if sid == "" {
@@ -53,7 +62,7 @@ func verifyXSRF(r *http.Request, scope string, secret []byte) bool {
 }
 
 // ValidateSessionXSRF validates dashboard-issued tokens used by cookie-authenticated
-// admin API writes. Non-browser *** don't require a CSRF token.
+// admin API writes. Requests authenticated with a Bearer token do not need a CSRF token.
 func ValidateSessionXSRF(r *http.Request, scope string) bool {
 	secret, ok := xsrfSecret()
 	if !ok {
