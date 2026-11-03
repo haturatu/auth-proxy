@@ -18,6 +18,17 @@ import (
 func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	targetURL := os.Getenv("TARGET_URL")
 
+	// Browser CSRF defense is scoped to our own UI/admin endpoints, not to
+	// arbitrary proxied traffic (WebDAV, APIs, streaming, etc.).
+	crossOrigin := http.NewCrossOriginProtection()
+	for _, entry := range strings.Split(os.Getenv("CSRF_TRUSTED_ORIGINS"), ",") {
+		origin := strings.TrimSpace(entry)
+		if origin == "" { continue }
+		if err := crossOrigin.AddTrustedOrigin(origin); err != nil {
+			panic("invalid CSRF_TRUSTED_ORIGINS: " + err.Error())
+		}
+	}
+
 	// --- Create routers for Web and API ---
 	webMux := http.NewServeMux()
 	apiMux := http.NewServeMux()
@@ -52,31 +63,31 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 		webMux.Handle(config.Paths.Login, loginHandler)
 
 		if config.Paths.RegisterEnabled {
-			registerPostHandler := middleware.RateLimitMiddleware(rateLimiter)(http.HandlerFunc(handlers.RegisterHandler))
+			registerPostHandler := middleware.RateLimitMiddleware(rateLimiter)(middleware.LimitAuthBody(http.HandlerFunc(handlers.RegisterHandler)))
 			registerHandler := methodSwitch(registerPageHandler, registerPostHandler)
 			webMux.Handle(config.Paths.Register, registerHandler)
 		}
 
-		accountPasswordPostHandler := http.HandlerFunc(handlers.ChangePasswordHandler)
+		accountPasswordPostHandler := middleware.LimitAuthBody(http.HandlerFunc(handlers.ChangePasswordHandler))
 		accountPasswordHandler := methodSwitch(accountPasswordPageHandler, accountPasswordPostHandler)
 		webMux.Handle(config.Paths.AccountPassword, middleware.SessionAuth(accountPasswordHandler))
 		webMux.Handle(config.Paths.Account, middleware.SessionAuth(accountPageHandler))
 		webMux.Handle(config.Paths.Admin, middleware.SessionAuth(middleware.AdminMiddleware(http.HandlerFunc(handlers.AdminPageHandler))))
 	} else {
 		// Go template frontend routes
-		webMux.HandleFunc(config.Paths.Login, handlers.LoginHandler)
+		webMux.Handle(config.Paths.Login, middleware.LimitAuthBody(http.HandlerFunc(handlers.LoginHandler)))
 		if config.Paths.RegisterEnabled {
 			webMux.Handle(config.Paths.Register, middleware.RateLimitMiddleware(rateLimiter)(http.HandlerFunc(handlers.RegisterHandler)))
 		}
 		webMux.Handle(config.Paths.Account, middleware.SessionAuth(http.HandlerFunc(handlers.AccountPageHandler)))
 		webMux.Handle(config.Paths.Admin, middleware.SessionAuth(middleware.AdminMiddleware(http.HandlerFunc(handlers.AdminPageHandler))))
-		webMux.Handle(config.Paths.AccountPassword, middleware.SessionAuth(http.HandlerFunc(handlers.ChangePasswordHandler)))
+		webMux.Handle(config.Paths.AccountPassword, middleware.SessionAuth(middleware.LimitAuthBody(http.HandlerFunc(handlers.ChangePasswordHandler))))
 	}
 	webMux.HandleFunc(config.Paths.Logout, handlers.LogoutHandler)
 
 	// --- API Routes (No XSRF) ---
-	apiMux.HandleFunc("/api/auth/token", handlers.TokenHandler)
-	apiMux.HandleFunc("/auth/refresh", handlers.RefreshTokenHandler)
+	apiMux.Handle("/api/auth/token", middleware.LimitAuthBody(http.HandlerFunc(handlers.TokenHandler)))
+	apiMux.Handle("/auth/refresh", middleware.LimitAuthBody(http.HandlerFunc(handlers.RefreshTokenHandler)))
 
 	// Admin API endpoints
 	adminCreateUserAPI := http.HandlerFunc(handlers.CreateUserHandler)
@@ -92,8 +103,8 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	adminDeleteUserAPI := http.HandlerFunc(handlers.DeleteUserHandler)
 	adminSetStatusAPI := http.HandlerFunc(handlers.SetUserActiveStatusHandler)
 
-	apiMux.Handle(config.Paths.AdminUsersAPI, middleware.BearerAuth(middleware.AdminMiddleware(adminUsersAPI)))
-	apiMux.Handle(config.Paths.AdminUsersAPI+"/", middleware.BearerAuth(middleware.AdminMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	apiMux.Handle(config.Paths.AdminUsersAPI, crossOrigin.Handler(middleware.AdminBearerAuth(middleware.AdminMiddleware(middleware.LimitAuthBody(adminUsersAPI)))))
+	apiMux.Handle(config.Paths.AdminUsersAPI+"/", crossOrigin.Handler(middleware.AdminBearerAuth(middleware.AdminMiddleware(middleware.LimitAuthBody(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
 		case strings.HasSuffix(path, "/role") && r.Method == http.MethodPost:
@@ -105,16 +116,21 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 		default:
 			http.NotFound(w, r)
 		}
-	}))))
+	}))))))
 
 	// --- Main Application Proxy ---
 	proxyHandler := handlers.NewProxy(targetURL)
 
 	// --- XSRF Protection (for Web UI) ---
-	xsrfProtectedWebMux := middleware.HandleOptions(middleware.XSRF(webMux))
+	xsrfProtectedWebMux := crossOrigin.Handler(middleware.HandleOptions(middleware.XSRF(webMux)))
 
 	// --- Final Handler ---
 	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The refresh endpoint is outside the configured /api/ prefix.
+		if r.URL.Path == "/auth/refresh" {
+			apiMux.ServeHTTP(w, r)
+			return
+		}
 		// Handle API paths
 		if strings.HasPrefix(r.URL.Path, config.Paths.APIPath) {
 			// Check if a specific handler exists in the API mux
