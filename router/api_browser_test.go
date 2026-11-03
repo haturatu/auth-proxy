@@ -73,7 +73,7 @@ func TestEventSourceCookieOnlyViaRouter(t *testing.T) {
 	t.Setenv("PROTECT_API", "true")
 	t.Setenv("API_AUTH_MODE", "session")
 	config.Init()
-	h := NewRouter(middleware.NewRateLimiter())
+	h := NewRouter(middleware.NewRateLimiter(), middleware.NewLoginRateLimiter())
 
 	req := httptest.NewRequest("GET", "http://192.168.10.5:8080/api/events", nil)
 	req.RemoteAddr = "192.168.20.14:45000"

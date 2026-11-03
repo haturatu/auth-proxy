@@ -10,6 +10,11 @@ import (
 
 const maxRateLimitClients = 10000
 
+// NewLoginRateLimiter is shared by both browser and API login endpoints.
+func NewLoginRateLimiter() *types.RateLimiter {
+	return &types.RateLimiter{Requests: make(map[string][]int64), Max: config.Paths.AuthRateLimitMaxRequests, Window: time.Duration(config.Paths.AuthRateLimitWindowSeconds) * time.Second}
+}
+
 func NewRateLimiter() *types.RateLimiter {
 	return &types.RateLimiter{Requests: make(map[string][]int64), Max: config.Paths.RateLimitMaxRequests, Window: time.Duration(config.Paths.RateLimitWindowSeconds) * time.Second}
 }
