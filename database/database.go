@@ -159,6 +159,21 @@ func createTables() {
 	}
 	logging.AppLog.Info("Users table verified successfully")
 
+	// Add a separate temporary login lock. Keep is_active exclusively for
+	// administrator disablement. This is safe for existing databases on all drivers.
+	lockColumn := map[string]string{
+		"sqlite3": "DATETIME",
+		"postgres": "TIMESTAMP WITH TIME ZONE",
+		"mysql": "DATETIME",
+	}[dbType]
+	rows, err := DB.Query("SELECT locked_until FROM users LIMIT 0")
+	if err == nil {
+		_ = rows.Close()
+	} else if _, alterErr := DB.Exec("ALTER TABLE users ADD COLUMN locked_until " + lockColumn); alterErr != nil {
+		logging.AppLog.Error("Failed to migrate users.locked_until", "error", alterErr, "previous_query_error", err)
+		os.Exit(1)
+	}
+
 	// Now, create the auth_tokens table
 	var createTokenTableSQL string
 	switch dbType {
