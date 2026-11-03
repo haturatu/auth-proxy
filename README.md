@@ -552,3 +552,7 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   
 
 > Never copy a fixed `SESSION_SECRET` from documentation into a live deployment. Generate a unique secret with `openssl rand -base64 48` and set it in `.env` or your secrets manager. Startup refuses secrets shorter than 32 bytes.
+
+### Logout endpoint
+
+Logout is a state-changing operation: only `POST` is supported, and the browser form submits a logout-scoped XSRF token. `GET /logout` deliberately returns `405 Method Not Allowed` to prevent cross-site logout requests.

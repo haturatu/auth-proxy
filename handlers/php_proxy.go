@@ -80,6 +80,8 @@ func NewPhpProxyHandler(scriptName string) http.Handler {
 
 		// Pass XSRF token to PHP
 		env["HTTP_X_XSRF_TOKEN"] = middleware.GetXSRFToken(r)
+		logoutToken, _ := middleware.GenerateSessionXSRF(r, config.Paths.Logout)
+		env["AUTH_LOGOUT_XSRF_TOKEN"] = logoutToken
 
 		// Asynchronously log the proxying action to avoid blocking the request.
 		worker.Submit(workerPool, func() {

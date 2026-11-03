@@ -20,10 +20,12 @@ func AccountPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logoutToken, _ := middleware.GenerateSessionXSRF(r, config.Paths.Logout)
 	data := map[string]interface{}{
-		"Paths":     config.Paths,
-		"User":      user,
-		"XSRFToken": middleware.GetXSRFToken(r),
+		"Paths":           config.Paths,
+		"User":            user,
+		"XSRFToken":       middleware.GetXSRFToken(r),
+		"LogoutXSRFToken": logoutToken,
 	}
 	if err := templates.ExecuteTemplate(w, "account.html", data); err != nil {
 		logging.AppLog.Error("Failed to execute account template", "error", err, "user_id", user.ID)

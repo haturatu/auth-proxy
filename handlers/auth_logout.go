@@ -11,6 +11,11 @@ import (
 
 // LogoutHandler invalidates the user's token by expiring the cookie.
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	ip := logging.GetClientIP(r)
 	cookie, err := r.Cookie("auth_token")
 	if err != nil {

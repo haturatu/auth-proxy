@@ -22,7 +22,10 @@
             <li><a href="<?php echo htmlspecialchars($paths['AccountPassword']); ?>">Change Password</a></li>
         </ul>
         <div class="logout-link">
-            <a href="<?php echo htmlspecialchars($paths['Logout']); ?>">Logout</a>
+            <form action="<?php echo htmlspecialchars($paths['Logout']); ?>" method="post">
+                <input type="hidden" name="xsrf_token" value="<?php echo htmlspecialchars($_SERVER['AUTH_LOGOUT_XSRF_TOKEN'] ?? '', ENT_QUOTES); ?>">
+                <button type="submit">Logout</button>
+            </form>
         </div>
     </div>
 </body>
