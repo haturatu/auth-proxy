@@ -71,6 +71,18 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: '**/go.sum'
 
+      # TEMPORARY: emit gofmt output so it can be committed back to this PR.
+      - name: Export formatted Go files
+        run: |
+          gofmt -w .
+          python3 - <<'PY'
+          import json, subprocess
+          files = subprocess.check_output(['git','diff','--name-only','--','*.go'], text=True).splitlines()
+          for path in files:
+              with open(path, encoding='utf-8') as file:
+                  print('FMT_FILE=' + json.dumps({'path':path,'content':file.read()}, separators=(',',':')))
+          PY
+
       - name: Check formatting
         run: |
           gofmt_output=$(gofmt -l .)
