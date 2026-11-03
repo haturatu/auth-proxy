@@ -21,12 +21,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Verify credential and regression tests
-        run: go test ./...
-      - name: Remove one-time verifier after success
+      - name: Verify credentials and record failures before cleanup
+        shell: bash
         run: |
+          set +e
+          go test ./... > /tmp/credential-tests.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            tail -n 200 /tmp/credential-tests.log > .temporary-ci-failure.txt
+            git add -f .temporary-ci-failure.txt
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-time-verify.yml
-          git commit -m "test: verified Go tests and removed temporary workflow"
+          git diff --cached --quiet || git commit -m "test: record credential regression outcome"
           git push origin HEAD:fix/issue-8-atomic-refresh-rotation
+          exit "$status"
