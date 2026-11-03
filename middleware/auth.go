@@ -55,10 +55,9 @@ func SessionAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add user info to context and headers for downstream handlers
+		// Only attach authenticated identity to context; the reverse proxy rebuilds
+		// identity headers after removing untrusted incoming values.
 		ctx := context.WithValue(r.Context(), types.SessionDataContextKey, user)
-		r.Header.Set("X-Username", user.Username)
-		r.Header.Set("X-User-Role", user.Role)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

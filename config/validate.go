@@ -20,5 +20,21 @@ func Validate() error {
 	if err != nil || target.Host == "" || (target.Scheme != "http" && target.Scheme != "https") || target.User != nil {
 		return fmt.Errorf("TARGET_URL must be an absolute http(s) URL without userinfo")
 	}
+	mode := os.Getenv("API_AUTH_MODE")
+	switch mode {
+	case "", "bearer":
+	case "session", "either":
+		if !getEnvAsBool("PROTECT_API", false) {
+			return fmt.Errorf("PROTECT_API=true is required for API_AUTH_MODE=%s", mode)
+		}
+	default:
+		return fmt.Errorf("API_AUTH_MODE must be bearer, session, or either")
+	}
+	if seed := os.Getenv("UPSTREAM_ASSERTION_ED25519_SEED"); seed != "" {
+		key, err := base64.StdEncoding.DecodeString(seed)
+		if err != nil || len(key) != 32 {
+			return fmt.Errorf("UPSTREAM_ASSERTION_ED25519_SEED must be base64-encoded 32 bytes")
+		}
+	}
 	return nil
 }
