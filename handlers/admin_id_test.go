@@ -6,9 +6,9 @@ import (
 
 func TestAdminUserIDStrictParsing(t *testing.T) {
 	for _, tc := range []struct {
-		path string
+		path   string
 		suffix string
-		valid bool
+		valid  bool
 	}{
 		{"/api/admin/users/17/role", "/role", true},
 		{"/api/admin/users/17/status", "/status", true},
