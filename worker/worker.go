@@ -18,10 +18,9 @@ func NewWorkerPool() *types.WorkerPool {
 	}
 
 	pool := &types.WorkerPool{
-		Workers:    numWorkers,
-		TaskQueue:  make(chan func(), numWorkers*2),
-		ResultChan: make(chan interface{}, numWorkers*2),
-		Active:     0,
+		Workers:   numWorkers,
+		TaskQueue: make(chan func(), numWorkers*2),
+		Active:    0,
 	}
 
 	for i := 0; i < numWorkers; i++ {
@@ -58,5 +57,4 @@ func ActiveWorkers(p *types.WorkerPool) int64 {
 func Close(p *types.WorkerPool) {
 	close(p.TaskQueue)
 	p.Wg.Wait()
-	close(p.ResultChan)
 }
