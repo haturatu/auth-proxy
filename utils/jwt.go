@@ -45,6 +45,27 @@ func jwtAudience() string {
 	return "auth-proxy:local-test"
 }
 
+// credentialTag binds a JWT to the current password hash without exposing
+// the password hash to clients.
+func credentialTag(key []byte, passwordHash string) string {
+	h := hmac.New(sha256.New, key)
+	_, _ = h.Write([]byte("auth-proxy/password-credential/v1:"))
+	_, _ = h.Write([]byte(passwordHash))
+	return base64Encode(h.Sum(nil)[:16])
+}
+
+// JWTMatchesCredentials checks the server-side password state on each API call.
+func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
+	if payload == nil || user == nil || payload.CredentialTag == "" {
+		return false
+	}
+	key, err := jwtSigningKey()
+	if err != nil {
+		return false
+	}
+	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, user.PasswordHash)))
+}
+
 func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 	key, err := jwtSigningKey()
 	if err != nil {
@@ -56,7 +77,7 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 	}
 	payloadJSON, err := json.Marshal(types.JWTPayload{
 		Issuer: "auth-proxy", Audience: jwtAudience(), IssuedAt: time.Now().Unix(), NotBefore: time.Now().Unix(),
-		UserID: user.ID, Exp: time.Now().Add(duration).Unix(),
+		UserID: user.ID, Exp: time.Now().Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
 	})
 	if err != nil {
 		return "", err
@@ -111,7 +132,7 @@ func ValidateJWT(value string) (*types.JWTPayload, error) {
 	if payload.Issuer != "auth-proxy" || payload.Audience != jwtAudience() ||
 		payload.IssuedAt <= 0 || payload.IssuedAt > now+60 ||
 		payload.NotBefore <= 0 || payload.NotBefore > now+60 ||
-		payload.UserID <= 0 || payload.Exp <= now {
+		payload.UserID <= 0 || payload.Exp <= now || payload.CredentialTag == "" {
 
 		return nil, errors.New("token expired or invalid")
 	}
