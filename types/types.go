@@ -19,6 +19,8 @@ type PathConfig struct {
 	Assets          string
 	FrontPath       string
 	APIPath         string
+	APIAuthMode     string
+	APISessionCSRF  string
 
 	// Booleans
 	CookieSecure    bool

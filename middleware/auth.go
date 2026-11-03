@@ -18,6 +18,12 @@ import (
 func SessionAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := logging.GetClientIP(r)
+		// WebSocket handshakes are GET requests but must still validate
+		// Origin to prevent cross-site WebSocket hijacking.
+		if (isWebSocketUpgrade(r) || isUnsafeMethod(r.Method)) && !sameOriginRequest(r) {
+			http.Error(w, "Cross-origin session request denied", http.StatusForbidden)
+			return
+		}
 		cookie, err := r.Cookie("auth_token")
 
 		if err != nil {
@@ -39,7 +45,7 @@ func SessionAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		if user == nil {
+		if user == nil || !user.IsActive {
 			// Clear the invalid cookie
 			http.SetCookie(w, &http.Cookie{
 				Name:     "auth_token",
@@ -47,7 +53,7 @@ func SessionAuth(next http.Handler) http.Handler {
 				Path:     "/",
 				MaxAge:   -1,
 				HttpOnly: true,
-				Secure:   config.Paths.CookieSecure,
+				Secure:   CookieSecure(r),
 				SameSite: http.SameSiteLaxMode,
 			})
 			logging.SecurityLog.Warn("ACCESS DENIED", "reason", "invalid or expired session token", "path", r.URL.Path, "ip", ip)
@@ -55,18 +61,24 @@ func SessionAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add user info to context and headers for downstream handlers
+		// Only attach authenticated identity to context; the reverse proxy rebuilds
+		// identity headers after removing untrusted incoming values.
 		ctx := context.WithValue(r.Context(), types.SessionDataContextKey, user)
-		r.Header.Set("X-Username", user.Username)
-		r.Header.Set("X-User-Role", user.Role)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-// BearerAuth is a middleware that checks for a valid JWT Bearer token.
-// If the token is valid, it adds the user info to the context and proceeds.
-// If not, it returns a 401 Unauthorized error. Suitable for API endpoints.
-func BearerAuth(next http.Handler) http.Handler {
+// BearerAuth accepts JWT Bearer authentication only. Browser cookies must
+// never silently authorize proxied API calls, including read-only requests.
+func BearerAuth(next http.Handler) http.Handler { return bearerAuth(next, false) }
+
+// AdminBearerAuth permits session-cookie authentication for the browser admin
+// UI, with a signed CSRF token required on unsafe methods.
+func AdminBearerAuth(next http.Handler) http.Handler {
+	return bearerAuth(next, true)
+}
+
+func bearerAuth(next http.Handler, allowAdminCookie bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := logging.GetClientIP(r)
 		authHeader := r.Header.Get("Authorization")
@@ -112,7 +124,20 @@ func BearerAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// --- Fallback to Cookie-based session for browser clients ---
+		if !allowAdminCookie {
+			logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "Bearer token required", "path", r.URL.Path, "ip", ip)
+			http.Error(w, "Unauthorized: Bearer token required", http.StatusUnauthorized)
+			return
+		}
+
+		// Only the first-party admin UI may authenticate via a browser cookie.
+		// CrossOriginProtection and the signed xsrftoken are complementary:
+		// the former checks browser origin signals, the latter binds mutations
+		// to the authenticated session even when origin headers are absent.
+		if isUnsafeMethod(r.Method) && !ValidateSessionXSRF(r, config.Paths.Admin) {
+			http.Error(w, "CSRF token required for cookie-authenticated writes", http.StatusForbidden)
+			return
+		}
 		cookie, err := r.Cookie("auth_token")
 		if err != nil {
 			// No Authorization header AND no cookie, deny access
@@ -123,7 +148,7 @@ func BearerAuth(next http.Handler) http.Handler {
 
 		tokenStr := cookie.Value
 		user, err := models.GetUserByToken(tokenStr)
-		if err != nil || user == nil {
+		if err != nil || user == nil || !user.IsActive {
 			logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "invalid session cookie", "path", r.URL.Path, "ip", ip)
 			http.Error(w, "Unauthorized: Invalid session", http.StatusUnauthorized)
 			return

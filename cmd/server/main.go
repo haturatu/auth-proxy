@@ -27,6 +27,18 @@ func main() {
 		logging.AppLog.Error("Invalid configuration", "error", err)
 		os.Exit(1)
 	}
+	logging.AppLog.Info("Authentication plane configured",
+		"protect_frontend", config.Paths.ProtectFrontend,
+		"protect_api", config.Paths.ProtectAPI,
+		"api_auth_mode", config.Paths.APIAuthMode,
+	)
+
+	// Only honor forwarded headers from explicitly configured proxy peers.
+	// Direct clients on another VLAN require no trusted CIDR.
+	if err := logging.ConfigureTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
+		logging.AppLog.Error("Invalid TRUSTED_PROXY_CIDRS", "error", err)
+		os.Exit(1)
+	}
 
 	database.InitDB()
 	defer database.CloseDB()
@@ -57,7 +69,15 @@ func main() {
 	}
 	listenAddr := ":" + port
 	logging.AppLog.Info("Server starting on " + listenAddr)
-	if err := http.ListenAndServe(listenAddr, mux); err != nil {
+	srv := &http.Server{
+		Addr:                listenAddr,
+		Handler:             mux,
+		ReadHeaderTimeout:   5 * time.Second,
+		IdleTimeout:         60 * time.Second,
+		MaxHeaderBytes:      32 << 10,
+		MaxHeaderValueCount: 128,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		logging.AppLog.Error("Server failed to start", "error", err)
 		os.Exit(1)
 	}

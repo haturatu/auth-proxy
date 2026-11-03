@@ -1,3 +1,5 @@
+セキュリティ設定（VLAN間の直接アクセスを含む）: [SECURITY.md](SECURITY.md)。
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
@@ -128,7 +130,7 @@ Docker Compose で SQLite（標準）・PostgreSQL・MySQL・外部 DB を切り
 
 APIリクエストの場合、クライアントは`Authorization: Bearer <token>`ヘッダーにJWTアクセストークンを含める必要があります。サーバー上のミドルウェアが、トークンの署名と有効期限を検証します。このプロセスはステートレスであり、リクエストごとにデータベースを検索する必要がないため、非常に効率的です。アクセストークンが期限切れになった場合、クライアントはリフレッシュトークンを使用して、再認証することなく新しいアクセストークンを要求できます。
 
-**認証の優先順位に関する注意:** APIエンドポイントが保護されている場合（`PROTECT_API=true`）、ミドルウェアはまず`Authorization: Bearer`ヘッダーを探します。このヘッダーが存在しない場合、フォールバックとして`auth_token`セッションクッキーの検証を試みます。これにより、Web UIにログインしているユーザーは、ブラウザセッションを使用してAPIに対しても認証できます。しかし、これはAPIエンドポイントが有効なJWTまたは有効なセッションクッキーのいずれかによってアクセス可能であることを意味します。
+**認証:** `PROTECT_API=true` のとき、`API_AUTH_MODE=bearer` が標準（Bearer JWT必須）です。ブラウザのSSE／WebSocket／APIにCookie認証を使う場合は `session`、BearerとCookieの両方を許可する場合は `either` を明示指定します。Cookie認証では同一オリジン検証を行い、`API_SESSION_CSRF=origin`（標準）では既存SPAを変更せずにunsafeメソッドを保護します。`xsrf` にすると `/api/auth/csrf` のトークンも必須になります。[ブラウザAPI認証ガイド](docs/browser-session-auth.md) を参照してください。
 
 ### トランスポート層セキュリティ（HTTPS）
 

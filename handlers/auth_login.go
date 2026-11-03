@@ -9,10 +9,21 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
+	"os"
 	"time"
 )
 
-var templates = template.Must(template.ParseGlob("templates/*.html"))
+// loadTemplates handles both server startup from the repository root and
+// package tests running from the handlers/ working directory.
+var templates = loadTemplates()
+
+func loadTemplates() *template.Template {
+	pattern := "templates/*.html"
+	if _, err := os.Stat("templates"); errors.Is(err, os.ErrNotExist) {
+		pattern = "../templates/*.html"
+	}
+	return template.Must(template.ParseGlob(pattern))
+}
 
 // authenticateUser handles the core logic for authenticating a user, including brute-force protection.
 // It returns the authenticated user or an error if authentication fails.
@@ -103,7 +114,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("auth_token")
 	if err == nil {
 		user, _ := models.GetUserByToken(cookie.Value)
-		if user != nil {
+		if user != nil && user.IsActive {
 			http.Redirect(w, r, config.Paths.Account, http.StatusFound)
 			return
 		}
@@ -161,7 +172,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Expires:  token.ExpiresAt,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   config.Paths.CookieSecure, // Use Secure flag if on HTTPS
+			Secure:   middleware.CookieSecure(r),
 			SameSite: http.SameSiteLaxMode,
 		})
 

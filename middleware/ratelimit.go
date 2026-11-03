@@ -2,8 +2,8 @@ package middleware
 
 import (
 	"auth-proxy/config"
+	"auth-proxy/logging"
 	"auth-proxy/types"
-	"net"
 	"net/http"
 	"time"
 )
@@ -16,11 +16,7 @@ func NewRateLimiter() *types.RateLimiter {
 func RateLimitMiddleware(l *types.RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				http.Error(w, "Invalid client address", http.StatusBadRequest)
-				return
-			}
+			ip := logging.GetClientIP(r)
 			now := time.Now().Unix()
 			l.Mutex.Lock()
 			recent := l.Requests[ip][:0]

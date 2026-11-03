@@ -3,6 +3,7 @@ package handlers
 import (
 	"auth-proxy/config"
 	"auth-proxy/logging"
+	"auth-proxy/middleware"
 	"auth-proxy/models"
 	"net/http"
 	"time"
@@ -32,7 +33,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   config.Paths.CookieSecure,
+		Secure:   middleware.CookieSecure(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 
