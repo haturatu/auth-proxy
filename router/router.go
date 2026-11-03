@@ -14,6 +14,23 @@ import (
 	"time"
 )
 
+// isAuthUIAlias detects ambiguous spellings of service-owned UI routes.
+// Without this check, /admin/ or /ADMIN could reach a case/slash-insensitive
+// upstream when the proxied frontend is intentionally public.
+func isAuthUIAlias(path string) bool {
+	reserved := []string{
+		config.Paths.Login, config.Paths.Register, config.Paths.Logout,
+		config.Paths.Account, config.Paths.AccountPassword, config.Paths.Admin,
+	}
+	for _, route := range reserved {
+		if route != "" && path != route &&
+			strings.EqualFold(strings.TrimRight(path, "/"), strings.TrimRight(route, "/")) {
+			return true
+		}
+	}
+	return false
+}
+
 // NewRouter creates and configures the main application router.
 func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	targetURL := os.Getenv("TARGET_URL")
@@ -164,6 +181,12 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 		_, webPattern := webMux.Handler(r)
 		if webPattern != "" {
 			xsrfProtectedWebMux.ServeHTTP(w, r)
+			return
+		}
+
+		// Never forward path aliases of local authentication pages upstream.
+		if isAuthUIAlias(r.URL.Path) {
+			http.NotFound(w, r)
 			return
 		}
 
