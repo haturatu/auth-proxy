@@ -31,7 +31,7 @@ func Validate() error {
 	default:
 		return fmt.Errorf("API_AUTH_MODE must be bearer, session, or either")
 	}
-	switch strings.ToLower(os.Getenv("API_SESSION_CSRF")) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("API_SESSION_CSRF"))) {
 	case "", "origin", "xsrf":
 	default:
 		return fmt.Errorf("API_SESSION_CSRF must be origin or xsrf")
