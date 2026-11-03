@@ -1,0 +1,31 @@
+name: Bounded security fuzzing
+
+on:
+  pull_request:
+    paths:
+      - 'router/**'
+      - 'handlers/**'
+      - 'middleware/**'
+      - 'utils/**'
+      - '.github/workflows/security-fuzz.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: API prefix fuzz (3 seconds)
+        run: go test -run '^$' -fuzz '^FuzzAPIPrefixBoundary$' -fuzztime=3s -parallel=1 ./router
+      - name: JWT parser fuzz (3 seconds)
+        run: go test -run '^$' -fuzz '^FuzzValidateJWTNeverPanics$' -fuzztime=3s -parallel=1 ./utils
+      - name: Isolated chaos route and proxy tests
+        run: go test -race -run 'TestSecurityChaos|TestReverseProxyRejectsForgedIdentityHeaders|TestClientIPVLANAndTrustedProxy' ./router ./handlers ./logging
