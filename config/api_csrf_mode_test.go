@@ -14,9 +14,13 @@ func TestAPICSRFModeNormalizesAndRejectsUnknown(t *testing.T) {
 	t.Setenv("PROTECT_API", "true")
 	for _, value := range []string{"xsrf", " XSRF ", "XsRf"} {
 		t.Setenv("API_SESSION_CSRF", value)
-		if err := Validate(); err != nil { t.Fatal(err) }
+		if err := Validate(); err != nil {
+			t.Fatal(err)
+		}
 		Init()
-		if Paths.APISessionCSRF != "xsrf" { t.Fatalf("%q yields %q", value, Paths.APISessionCSRF) }
+		if Paths.APISessionCSRF != "xsrf" {
+			t.Fatalf("%q yields %q", value, Paths.APISessionCSRF)
+		}
 	}
 	t.Setenv("API_SESSION_CSRF", "disabled")
 	if err := Validate(); err == nil {
