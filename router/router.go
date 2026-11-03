@@ -193,7 +193,7 @@ func StartBackgroundTasks(pool *types.WorkerPool, limiter, loginLimiter *types.R
 	// Run initial cleanup tasks at startup
 	submitTokenCleanup(pool)
 	submitRateLimiterCleanup(pool, limiter)
-        submitRateLimiterCleanup(pool, loginLimiter)
+	submitRateLimiterCleanup(pool, loginLimiter)
 
 	// Run tasks on their respective tickers
 	for {
@@ -202,7 +202,7 @@ func StartBackgroundTasks(pool *types.WorkerPool, limiter, loginLimiter *types.R
 			submitTokenCleanup(pool)
 		case <-rateLimiterTicker.C:
 			submitRateLimiterCleanup(pool, limiter)
-        submitRateLimiterCleanup(pool, loginLimiter)
+			submitRateLimiterCleanup(pool, loginLimiter)
 		}
 	}
 }

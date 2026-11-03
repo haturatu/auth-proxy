@@ -48,7 +48,7 @@ func main() {
 	handlers.SetWorkerPool(pool)
 
 	rateLimiter := middleware.NewRateLimiter()
-    loginLimiter := middleware.NewLoginRateLimiter()
+	loginLimiter := middleware.NewLoginRateLimiter()
 	mainRouter := router.NewRouter(rateLimiter, loginLimiter)
 	go router.StartBackgroundTasks(pool, rateLimiter, loginLimiter)
 

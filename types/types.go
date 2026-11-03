@@ -29,13 +29,13 @@ type PathConfig struct {
 	RegisterEnabled bool
 
 	// Security Policies
-	MaxLoginAttempts       int
-	AuthRateLimitMaxRequests int
+	MaxLoginAttempts           int
+	AuthRateLimitMaxRequests   int
 	AuthRateLimitWindowSeconds int
-	LockoutDurationMinutes int
-	RateLimitMaxRequests   int
-	RateLimitWindowSeconds int
-	PasswordPolicy         string
+	LockoutDurationMinutes     int
+	RateLimitMaxRequests       int
+	RateLimitWindowSeconds     int
+	PasswordPolicy             string
 
 	// Token Durations
 	TokenDurationHours         int
