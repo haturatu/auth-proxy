@@ -17,7 +17,6 @@ type PathConfig struct {
 	Admin           string
 	AdminUsersAPI   string
 	Assets          string
-	FrontPath       string
 	APIPath         string
 	APIAuthMode     string
 	APISessionCSRF  string
