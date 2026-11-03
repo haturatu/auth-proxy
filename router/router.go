@@ -14,6 +14,22 @@ import (
 	"time"
 )
 
+// allowedRequestHost validates the external Host only when an explicit list
+// is configured. Public deployments should set ALLOWED_HOSTS to all front-door
+// host:port combinations; default remains open for local development.
+func allowedRequestHost(host string) bool {
+	allowed := strings.TrimSpace(os.Getenv("ALLOWED_HOSTS"))
+	if allowed == "" {
+		return true
+	}
+	for _, entry := range strings.Split(allowed, ",") {
+		if strings.EqualFold(strings.TrimSpace(entry), host) {
+			return true
+		}
+	}
+	return false
+}
+
 // NewRouter creates and configures the main application router.
 func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	targetURL := os.Getenv("TARGET_URL")
@@ -133,6 +149,10 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 
 	// --- Final Handler ---
 	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !allowedRequestHost(r.Host) {
+			http.Error(w, "Misdirected Request", http.StatusMisdirectedRequest)
+			return
+		}
 		// The refresh endpoint is outside the configured /api/ prefix.
 		if r.URL.Path == "/auth/refresh" {
 			apiMux.ServeHTTP(w, r)
