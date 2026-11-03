@@ -204,9 +204,9 @@ DATABASE_URL=mysql://test:test@127.0.0.1:3306/auth
 # フロントエンドモード: "js" (デフォルト) または "php"
 FRONTEND_TYPE=js
 # trueの場合、フロントエンドパスをセッション認証で保護します
-PROTECT_FRONTEND=false
+PROTECT_FRONTEND=true
 # trueの場合、APIパスをベアラートークン認証で保護します
-PROTECT_API=false
+PROTECT_API=true
 # 保護対象のフロントエンドのベースパス
 # 保護対象のAPIのベースパス
 API_PATH=/api/
