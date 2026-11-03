@@ -46,7 +46,7 @@ func TestAPIRootDoesNotFallThroughToUnprotectedFrontend(t *testing.T) {
 	config.Paths.Admin = "/admin"
 	config.Paths.AdminUsersAPI = "/api/admin/users"
 	config.Paths.Assets = "/assets"
-	h := NewRouter(middleware.NewRateLimiter())
+	h := NewRouter(middleware.NewRateLimiter(), middleware.NewLoginRateLimiter())
 	for _, path := range []string{"/api", "/api/", "/api/files"} {
 		req := httptest.NewRequest(http.MethodGet, "http://app.local"+path, nil)
 		got := httptest.NewRecorder()

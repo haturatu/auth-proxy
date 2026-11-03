@@ -26,7 +26,7 @@ func TestCustomAdminRouteRemainsInternalAndAuthenticated(t *testing.T) {
 	config.Paths.AccountPassword = "/account/password"
 	config.Paths.Admin = "/admin"
 	config.Paths.Assets = "/assets"
-	h := NewRouter(middleware.NewRateLimiter())
+	h := NewRouter(middleware.NewRateLimiter(), middleware.NewLoginRateLimiter())
 	for _, path := range []string{"/internal/users", "/internal/users/1/role"} {
 		r := httptest.NewRequest(http.MethodGet, "http://app.example"+path, nil)
 		w := httptest.NewRecorder()
