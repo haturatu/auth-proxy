@@ -6,12 +6,12 @@ import (
 	"auth-proxy/logging"
 	"auth-proxy/models"
 	"auth-proxy/utils"
-	"flag"
 	"bufio"
-	"io"
-	"strings"
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )

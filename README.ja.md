@@ -61,6 +61,8 @@ chmod +x run-demo.sh
 bash run-demo.sh
 ```
 
+Docker Compose で SQLite（標準）・PostgreSQL・MySQL・外部 DB を切り替えて起動できます。[Docker 起動ガイド](docs/docker.ja.md) を参照してください。
+
 ## 主な機能
 
 - **認証**: ログイン、ログアウト、登録ページを提供します。
