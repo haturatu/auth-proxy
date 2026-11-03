@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,19 @@ func signHS256(key []byte, data string) []byte {
 	h := hmac.New(sha256.New, key)
 	_, _ = h.Write([]byte(data))
 	return h.Sum(nil)
+}
+
+// jwtAudience separates access-token trust across independent deployments.
+// Production requires TARGET_URL; an explicit audience is recommended if
+// multiple gateways share one upstream service.
+func jwtAudience() string {
+	if configured := strings.TrimSpace(os.Getenv("JWT_AUDIENCE")); configured != "" {
+		return configured
+	}
+	if target, err := url.Parse(os.Getenv("TARGET_URL")); err == nil && target.Host != "" {
+		return "auth-proxy:" + target.Host
+	}
+	return "auth-proxy:local-test"
 }
 
 // credentialTag binds each JWT to the server's current password hash.
@@ -61,8 +75,10 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	now := time.Now()
 	payloadJSON, err := json.Marshal(types.JWTPayload{
-		UserID: user.ID, Exp: time.Now().Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
+		Issuer: "auth-proxy", Audience: jwtAudience(), IssuedAt: now.Unix(), NotBefore: now.Unix(),
+		UserID: user.ID, Exp: now.Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
 	})
 	if err != nil {
 		return "", err
@@ -113,7 +129,11 @@ func ValidateJWT(value string) (*types.JWTPayload, error) {
 	if err = json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("invalid JWT claims: %w", err)
 	}
-	if payload.UserID <= 0 || payload.Exp <= time.Now().Unix() || payload.CredentialTag == "" {
+	now := time.Now().Unix()
+	if payload.Issuer != "auth-proxy" || payload.Audience != jwtAudience() ||
+		payload.IssuedAt <= 0 || payload.IssuedAt > now+60 ||
+		payload.NotBefore <= 0 || payload.NotBefore > now+60 ||
+		payload.UserID <= 0 || payload.Exp <= now || payload.CredentialTag == "" {
 		return nil, errors.New("token expired or invalid")
 	}
 	return &payload, nil
