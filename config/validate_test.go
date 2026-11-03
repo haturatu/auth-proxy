@@ -61,3 +61,26 @@ func TestUpstreamAssertionBearerRequiresSigningKey(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestValidateCookieSecure(t *testing.T) {
+    t.Setenv("SESSION_SECRET", strings.Repeat("x", 48))
+    t.Setenv("XSRF_SECRET_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))
+    t.Setenv("TARGET_URL", "http://127.0.0.1:8081")
+    t.Setenv("API_AUTH_MODE", "bearer")
+    t.Setenv("UPSTREAM_ASSERTION_AS_BEARER", "false")
+    t.Setenv("UPSTREAM_ASSERTION_ED25519_SEED", "")
+    for _, tc := range []struct {
+        value string
+        valid bool
+    }{
+        {"", true}, {"true", true}, {"false", true}, {"auto", true},
+        {"always", true}, {"never", true}, {"TRUE", true}, {"invalid", false},
+    } {
+        t.Run(tc.value, func(t *testing.T) {
+            t.Setenv("COOKIE_SECURE", tc.value)
+            if err := Validate(); (err == nil) != tc.valid {
+                t.Fatalf("COOKIE_SECURE=%q: %v", tc.value, err)
+            }
+        })
+    }
+}
