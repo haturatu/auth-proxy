@@ -8,7 +8,7 @@ import (
 	"auth-proxy/utils"
 	"context"
 	"database/sql"
-    "errors"
+	"errors"
 	"net/http"
 	"strings"
 )

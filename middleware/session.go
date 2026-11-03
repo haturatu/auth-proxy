@@ -37,11 +37,11 @@ func sessionUserRequest(r *http.Request, user *types.User) *http.Request {
 
 func expireSessionCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
-		Name: "auth_token",
-		Path: "/",
-		MaxAge: -1,
+		Name:     "auth_token",
+		Path:     "/",
+		MaxAge:   -1,
 		HttpOnly: true,
-		Secure: CookieSecure(r),
+		Secure:   CookieSecure(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }

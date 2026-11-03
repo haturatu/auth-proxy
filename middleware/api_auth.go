@@ -4,7 +4,7 @@ import (
 	"auth-proxy/config"
 	"auth-proxy/logging"
 	"encoding/json"
-    "errors"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
