@@ -39,25 +39,22 @@ func authenticateUser(username, password, ip string) (*types.User, error) {
 		return nil, errors.New("invalid username or password")
 	}
 
-	// Step 1: Check if the account is locked.
+	// An administrator-disabled account must never be re-enabled by a login attempt.
 	if !user.IsActive {
-		lockoutDuration := time.Duration(config.Paths.LockoutDurationMinutes) * time.Minute
+		logging.SecurityLog.Warn("AUTH FAIL", "username", username, "ip", ip, "reason", "account disabled")
+		return nil, errors.New("account is disabled")
+	}
 
-		// Check if the lockout period has expired.
-		if time.Since(user.UpdatedAt) < lockoutDuration {
-			logging.SecurityLog.Warn("AUTH FAIL", "username", username, "ip", ip, "reason", "account locked")
+	// Temporary lock is separate from administrative disablement.
+	if user.LockedUntil.Valid {
+		now := time.Now()
+		if now.Before(user.LockedUntil.Time) {
+			logging.SecurityLog.Warn("AUTH FAIL", "username", username, "ip", ip, "reason", "temporarily locked")
 			return nil, errors.New("account is temporarily locked")
-		} else {
-			// Lockout has expired. Reactivate the account but do not log the user in on this attempt.
-			if err := models.SetUserActiveStatus(user.ID, true); err != nil {
-				logging.AppLog.Error("Failed to reactivate user", "error", err, "user_id", user.ID, "ip", ip)
-				return nil, errors.New("internal server error")
-			}
-			if err := models.RecordLoginSuccess(user.ID); err != nil {
-				logging.AppLog.Error("Failed to reset failed login attempts on reactivation", "error", err, "user_id", user.ID, "ip", ip)
-			}
-			logging.SecurityLog.Info("ACCOUNT UNLOCKED", "username", username, "ip", ip)
-			return nil, errors.New("account has been unlocked, please try again")
+		}
+		if err := models.ClearExpiredLoginLock(user.ID, now); err != nil {
+			logging.AppLog.Error("Failed to clear expired login lock", "error", err, "user_id", user.ID)
+			return nil, errors.New("internal server error")
 		}
 	}
 
@@ -73,8 +70,8 @@ func authenticateUser(username, password, ip string) (*types.User, error) {
 		maxAttempts := config.Paths.MaxLoginAttempts
 
 		// Lock the account if max attempts are exceeded
-		if maxAttempts > 0 && updatedUser.FailedLogins >= maxAttempts {
-			if err := models.SetUserActiveStatus(user.ID, false); err != nil {
+		if maxAttempts > 0 && updatedUser != nil && updatedUser.FailedLogins >= maxAttempts {
+			if err := models.SetLoginLock(user.ID, time.Now().Add(time.Duration(config.Paths.LockoutDurationMinutes)*time.Minute)); err != nil {
 				logging.AppLog.Error("Failed to lock account", "error", err, "user_id", user.ID, "ip", ip)
 			}
 			logging.SecurityLog.Warn("ACCOUNT LOCKED", "username", username, "ip", ip)
@@ -145,7 +142,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Map authentication error to user-facing message
 			errMsg := "Invalid username or password."
-			if err.Error() == "account is temporarily locked" {
+			if err.Error() == "account is disabled" {
+                errMsg = "Account is disabled. Contact the administrator."
+            } else if err.Error() == "account is temporarily locked" {
 				errMsg = "Account is temporarily locked."
 			} else if err.Error() == "internal server error" {
 				errMsg = "An internal error occurred. Please try again."
