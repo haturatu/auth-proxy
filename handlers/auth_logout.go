@@ -32,7 +32,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   config.Paths.CookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 

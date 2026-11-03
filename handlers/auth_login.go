@@ -161,7 +161,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Expires:  token.ExpiresAt,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   r.TLS != nil, // Use Secure flag if on HTTPS
+			Secure:   config.Paths.CookieSecure, // Use Secure flag if on HTTPS
 			SameSite: http.SameSiteLaxMode,
 		})
 

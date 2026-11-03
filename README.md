@@ -63,6 +63,8 @@
   While integrating authentication into every application is good for security, it's a hassle to manage separate IDs and passwords for each one. This is a common problem for self-hosting enthusiasts who need a centralized way to control access.
   This project aims to solve that by acting as a central authentication service. By referencing the same database, user information can be shared across different applications.
   
+  Docker Compose supports SQLite (default), PostgreSQL, MySQL and external SQL servers. See the [Docker deployment guide](docs/docker.md).
+
   ## Features
   
   - **Authentication**: Provides login, logout, and registration pages.

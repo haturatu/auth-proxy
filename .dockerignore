@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.env.*
+*.db
+*.db-*
+auth-proxy-server
+admin-cli
+docs
+tests
+run-demo.sh
