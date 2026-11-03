@@ -11,7 +11,7 @@
 <body class="admin-page">
     <div class="container admin-container">
         <h1>User Management</h1>
-        <a href="{{.Paths.Account}}">My Account</a> | <a href="{{.Paths.Logout}}">Logout</a>
+        <a href="{{.Paths.Account}}">My Account</a> | <form action="{{.Paths.Logout}}" method="post" style="display:inline"><input type="hidden" name="xsrf_token" value="{{.LogoutXSRFToken}}"><button type="submit">Logout</button></form>
         <div class="table-container">
             <table>
                 <thead>
