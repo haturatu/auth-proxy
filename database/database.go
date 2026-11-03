@@ -204,7 +204,6 @@ func createTables() {
 			"user_id" INTEGER NOT NULL UNIQUE,
 			"token" TEXT NOT NULL UNIQUE,
 			"expires_at" DATETIME NOT NULL,
-			"is_revoked" BOOLEAN NOT NULL DEFAULT FALSE,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 		);`
 	case "postgres":
@@ -212,8 +211,7 @@ func createTables() {
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
 			token VARCHAR(255) NOT NULL UNIQUE,
-			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-			is_revoked BOOLEAN NOT NULL DEFAULT FALSE
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL
 		);`
 	case "mysql":
 		createRefreshTokenTableSQL = `CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -221,7 +219,6 @@ func createTables() {
 			user_id INT NOT NULL UNIQUE,
 			token VARCHAR(255) NOT NULL UNIQUE,
 			expires_at DATETIME NOT NULL,
-			is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
 			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 		);`
 	}
@@ -231,6 +228,40 @@ func createTables() {
 		os.Exit(1)
 	}
 	logging.AppLog.Info("Refresh_tokens table verified successfully")
+	// Existing databases may still have a legacy is_revoked column.
+	// Drop already-revoked rows before runtime stops consulting that column.
+	if rows, err := DB.Query("SELECT is_revoked FROM refresh_tokens LIMIT 0"); err == nil {
+		_ = rows.Close()
+		if _, err := DB.Exec("DELETE FROM refresh_tokens WHERE is_revoked = TRUE"); err != nil {
+			logging.AppLog.Error("Failed to retire revoked refresh tokens", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	// Spent refresh-token hashes are retained until expiry so replay can revoke
+	// the newest token in the same credential family.
+	var spentSQL string
+	switch dbType {
+	case "sqlite3":
+		spentSQL = `CREATE TABLE IF NOT EXISTS consumed_refresh_tokens (
+			token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL,
+			expires_at DATETIME NOT NULL, consumed_at DATETIME NOT NULL,
+			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)`
+	case "postgres":
+		spentSQL = `CREATE TABLE IF NOT EXISTS consumed_refresh_tokens (
+			token_hash VARCHAR(255) PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL, consumed_at TIMESTAMP WITH TIME ZONE NOT NULL)`
+	case "mysql":
+		spentSQL = `CREATE TABLE IF NOT EXISTS consumed_refresh_tokens (
+			token_hash VARCHAR(255) PRIMARY KEY, user_id INT NOT NULL,
+			expires_at DATETIME NOT NULL, consumed_at DATETIME NOT NULL,
+			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)`
+	}
+	if _, err := DB.Exec(spentSQL); err != nil {
+		logging.AppLog.Error("Failed to create consumed_refresh_tokens", "error", err, "db_type", dbType)
+		os.Exit(1)
+	}
+
 	for _, table := range []string{"auth_tokens", "refresh_tokens"} {
 		if err := migrateTokenHashes(table); err != nil {
 			logging.AppLog.Error("Failed to migrate bearer token hashes", "table", table, "error", err)
