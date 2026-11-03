@@ -208,7 +208,6 @@ PROTECT_FRONTEND=false
 # trueの場合、APIパスをベアラートークン認証で保護します
 PROTECT_API=false
 # 保護対象のフロントエンドのベースパス
-FRONT_PATH=/
 # 保護対象のAPIのベースパス
 API_PATH=/api/
 
@@ -536,7 +535,6 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 | `REFRESH_TOKEN_DURATION_DAYS` | APIクライアント用のJWTリフレッシュトークンの有効期間（日）。 | `7` |
 | `PROTECT_FRONTEND` | `true`の場合、すべてのフロントエンドパスをセッション認証経由でプロキシします。 | `false` |
 | `PROTECT_API` | `true`の場合、すべてのAPIパスをベアラートークン認証経由でプロキシします。 | `false` |
-| `FRONT_PATH` | `PROTECT_FRONTEND`で保護されるフロントエンドのベースパス。 | `/` |
 | `API_PATH` | `PROTECT_API`で保護されるAPIルートのベースパス。 | `/api/` |
 | `REGISTER` | `false`に設定すると、新規ユーザー登録を無効にします。 | `true` |
 | `AUTH_PATH_*` | ログイン、管理者ページなどの内部URLをカスタマイズするための変数セット。 | 様々、例: `/login`|
