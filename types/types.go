@@ -79,8 +79,8 @@ type RefreshToken struct {
 
 // JWTPayload defines the claims for the access token.
 type JWTPayload struct {
-	UserID int64  `json:"user_id"`
-	Exp    int64  `json:"exp"`
+	UserID int64 `json:"user_id"`
+	Exp    int64 `json:"exp"`
 }
 
 // RateLimiter represents a user-specific rate limiter.
