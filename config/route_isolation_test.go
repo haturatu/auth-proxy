@@ -14,7 +14,9 @@ func TestRejectOverlappingConfiguredRoutes(t *testing.T) {
 	t.Setenv("API_AUTH_MODE", "bearer")
 	t.Setenv("AUTH_PATH_LOGIN", "/login")
 	t.Setenv("AUTH_PATH_ADMIN_USERS_API", "/api/admin/users")
-	if err := Validate(); err != nil { t.Fatalf("valid settings: %v", err) }
+	if err := Validate(); err != nil {
+		t.Fatalf("valid settings: %v", err)
+	}
 	for _, tc := range []struct{ key, value string }{
 		{"AUTH_PATH_LOGIN", "/api/login"},
 		{"AUTH_PATH_LOGIN", "/api"},

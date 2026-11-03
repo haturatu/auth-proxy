@@ -26,7 +26,7 @@ func Validate() error {
 		strings.Contains(apiPath, "//") || strings.ContainsAny(apiPath, "?#%") || strings.Contains(apiPath, "..") {
 		return fmt.Errorf("API_PATH must be an absolute non-root URL prefix ending in /")
 	}
-	paths := []struct { key, value string }{
+	paths := []struct{ key, value string }{
 		{"AUTH_PATH_LOGIN", getEnv("AUTH_PATH_LOGIN", "/login")},
 		{"AUTH_PATH_REGISTER", getEnv("AUTH_PATH_REGISTER", "/register")},
 		{"AUTH_PATH_LOGOUT", getEnv("AUTH_PATH_LOGOUT", "/logout")},
