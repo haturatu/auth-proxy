@@ -80,12 +80,12 @@ type RefreshToken struct {
 
 // JWTPayload defines the claims for the access token.
 type JWTPayload struct {
-	Issuer    string `json:"iss"`
-	Audience  string `json:"aud"`
-	IssuedAt  int64  `json:"iat"`
-	NotBefore int64  `json:"nbf"`
-	UserID    int64  `json:"user_id"`
-	Exp       int64  `json:"exp"`
+	Issuer        string `json:"iss"`
+	Audience      string `json:"aud"`
+	IssuedAt      int64  `json:"iat"`
+	NotBefore     int64  `json:"nbf"`
+	UserID        int64  `json:"user_id"`
+	Exp           int64  `json:"exp"`
 	CredentialTag string `json:"cv"`
 }
 
