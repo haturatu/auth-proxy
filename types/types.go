@@ -52,6 +52,7 @@ type User struct {
 	PasswordHash string       `json:"-"`
 	Role         string       `json:"role"`
 	IsActive     bool         `json:"is_active"`
+	LockedUntil  sql.NullTime `json:"locked_until"`
 	FailedLogins int          `json:"failed_logins"`
 	LastLoginAt  sql.NullTime `json:"last_login_at"`
 	CreatedAt    time.Time    `json:"created_at"`

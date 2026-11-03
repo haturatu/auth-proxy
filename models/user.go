@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -86,12 +87,12 @@ func CreateUser(username, password, role string) (*types.User, error) {
 }
 
 // baseSelectQuery is the common set of columns for user queries
-const baseSelectQuery = "SELECT id, username, password_hash, role, is_active, failed_logins, last_login_at, created_at, updated_at FROM users"
+const baseSelectQuery = "SELECT id, username, password_hash, role, is_active, failed_logins, locked_until, last_login_at, created_at, updated_at FROM users"
 
 // scanUser scans a row into a User struct
 func scanUser(row *sql.Row) (*types.User, error) {
 	user := &types.User{}
-	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // User not found
@@ -126,7 +127,7 @@ func GetAllUsers() ([]types.User, error) {
 	var users []types.User
 	for rows.Next() {
 		var user types.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -157,7 +158,7 @@ func UpdateUserPassword(id int64, passwordHash string) error {
 
 // RecordLoginSuccess resets failed login attempts and updates last login time
 func RecordLoginSuccess(id int64) error {
-	query := database.Rebind("UPDATE users SET failed_logins = 0, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+	query := database.Rebind("UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
 	_, err := database.DB.Exec(query, id)
 	return err
 }
@@ -173,5 +174,19 @@ func RecordLoginFailure(id int64) error {
 func SetUserActiveStatus(id int64, isActive bool) error {
 	query := database.Rebind("UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
 	_, err := database.DB.Exec(query, isActive, id)
+	return err
+}
+
+// SetLoginLock sets a temporary lock without changing the administrator-controlled active flag.
+func SetLoginLock(id int64, until time.Time) error {
+	query := database.Rebind("UPDATE users SET locked_until = ?, failed_logins = 0 WHERE id = ?")
+	_, err := database.DB.Exec(query, until, id)
+	return err
+}
+
+// ClearExpiredLoginLock resets failed attempts after the configured lock expires.
+func ClearExpiredLoginLock(id int64, now time.Time) error {
+	query := database.Rebind("UPDATE users SET locked_until = NULL, failed_logins = 0 WHERE id = ? AND locked_until <= ?")
+	_, err := database.DB.Exec(query, id, now)
 	return err
 }
