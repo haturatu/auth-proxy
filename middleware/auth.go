@@ -8,6 +8,7 @@ import (
 	"auth-proxy/utils"
 	"context"
 	"database/sql"
+    "errors"
 	"net/http"
 	"strings"
 )
@@ -24,47 +25,24 @@ func SessionAuth(next http.Handler) http.Handler {
 			http.Error(w, "Cross-origin session request denied", http.StatusForbidden)
 			return
 		}
-		cookie, err := r.Cookie("auth_token")
-
+		user, err := resolveSessionUser(r)
 		if err != nil {
-			if err == http.ErrNoCookie {
+			if errors.Is(err, ErrMissingSession) {
 				logging.AppLog.Info("Redirecting to login (no session cookie)", "path", r.URL.Path, "ip", ip)
 				http.Redirect(w, r, config.Paths.Login, http.StatusFound)
 				return
 			}
-			logging.AppLog.Error("Error reading auth cookie", "error", err, "path", r.URL.Path, "ip", ip)
+			if errors.Is(err, ErrInvalidSession) {
+				expireSessionCookie(w, r)
+				logging.SecurityLog.Warn("ACCESS DENIED", "reason", "invalid or expired session", "path", r.URL.Path, "ip", ip)
+				http.Redirect(w, r, config.Paths.Login, http.StatusFound)
+				return
+			}
+			logging.AppLog.Error("Session database lookup failed", "error", err, "path", r.URL.Path, "ip", ip)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-
-		tokenStr := cookie.Value
-		user, err := models.GetUserByToken(tokenStr) // This still relies on the session token in the DB
-		if err != nil && err != sql.ErrNoRows {
-			logging.AppLog.Error("Error validating session token", "error", err, "path", r.URL.Path, "ip", ip)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-		if user == nil || !user.IsActive {
-			// Clear the invalid cookie
-			http.SetCookie(w, &http.Cookie{
-				Name:     "auth_token",
-				Value:    "",
-				Path:     "/",
-				MaxAge:   -1,
-				HttpOnly: true,
-				Secure:   CookieSecure(r),
-				SameSite: http.SameSiteLaxMode,
-			})
-			logging.SecurityLog.Warn("ACCESS DENIED", "reason", "invalid or expired session token", "path", r.URL.Path, "ip", ip)
-			http.Redirect(w, r, config.Paths.Login, http.StatusFound)
-			return
-		}
-
-		// Only attach authenticated identity to context; the reverse proxy rebuilds
-		// identity headers after removing untrusted incoming values.
-		ctx := context.WithValue(r.Context(), types.SessionDataContextKey, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, sessionUserRequest(r, user))
 	})
 }
 
@@ -138,25 +116,17 @@ func bearerAuth(next http.Handler, allowAdminCookie bool) http.Handler {
 			http.Error(w, "CSRF token required for cookie-authenticated writes", http.StatusForbidden)
 			return
 		}
-		cookie, err := r.Cookie("auth_token")
+		user, err := resolveSessionUser(r)
 		if err != nil {
-			// No Authorization header AND no cookie, deny access
-			logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "missing authentication token", "path", r.URL.Path, "ip", ip)
-			http.Error(w, "Unauthorized: An authentication token is required", http.StatusUnauthorized)
-			return
-		}
-
-		tokenStr := cookie.Value
-		user, err := models.GetUserByToken(tokenStr)
-		if err != nil || user == nil || !user.IsActive {
 			logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "invalid session cookie", "path", r.URL.Path, "ip", ip)
-			http.Error(w, "Unauthorized: Invalid session", http.StatusUnauthorized)
+			if !errors.Is(err, ErrMissingSession) && !errors.Is(err, ErrInvalidSession) {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			} else {
+				http.Error(w, "Unauthorized: Invalid session", http.StatusUnauthorized)
+			}
 			return
 		}
-
-		// User is authenticated via cookie, add to context and proceed
-		ctx := context.WithValue(r.Context(), types.SessionDataContextKey, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, sessionUserRequest(r, user))
 	})
 }
 
