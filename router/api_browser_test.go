@@ -42,7 +42,7 @@ func TestEventSourceCookieOnlyViaRouter(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec("INSERT INTO auth_tokens (user_id, token, expires_at) VALUES (1, ?, ?)",
-		"browser-session", now.Add(time.Hour)); err != nil {
+		database.TokenHash("browser-session"), now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
