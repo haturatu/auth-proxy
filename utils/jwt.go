@@ -67,12 +67,11 @@ func ValidateJWT(value string) (*types.JWTPayload, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Only signatures derived through HKDF are accepted. We intentionally do
+	// not support the previous raw-SESSION_SECRET signing key: all existing
+	// access JWTs must be reissued after upgrading.
 	if !hmac.Equal(supplied, signHS256(key, signedData)) {
-		// Opt-in temporary migration for pre-HKDF tokens only.
-		if os.Getenv("JWT_ACCEPT_LEGACY_SIGNATURE") != "true" ||
-			!hmac.Equal(supplied, signHS256([]byte(os.Getenv("SESSION_SECRET")), signedData)) {
-			return nil, errors.New("invalid signature")
-		}
+		return nil, errors.New("invalid signature")
 	}
 	headerBytes, err := base64Decode(parts[0])
 	if err != nil {

@@ -63,18 +63,17 @@ func SessionAuth(next http.Handler) http.Handler {
 	})
 }
 
-// BearerAuth is a middleware that checks for a valid JWT Bearer token.
-// If the token is valid, it adds the user info to the context and proceeds.
-// If not, it returns a 401 Unauthorized error. Suitable for API endpoints.
-func BearerAuth(next http.Handler) http.Handler { return bearerAuth(next, "") }
+// BearerAuth accepts JWT Bearer authentication only. Browser cookies must
+// never silently authorize proxied API calls, including read-only requests.
+func BearerAuth(next http.Handler) http.Handler { return bearerAuth(next, false) }
 
-// AdminBearerAuth permits cookie-authenticated admin mutations only with a valid
-// token issued for the admin dashboard. General proxied API mutations require Bearer.
+// AdminBearerAuth permits session-cookie authentication for the browser admin
+// UI, with a signed CSRF token required on unsafe methods.
 func AdminBearerAuth(next http.Handler) http.Handler {
-	return bearerAuth(next, config.Paths.Admin)
+	return bearerAuth(next, true)
 }
 
-func bearerAuth(next http.Handler, cookieCSRFScope string) http.Handler {
+func bearerAuth(next http.Handler, allowAdminCookie bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := logging.GetClientIP(r)
 		authHeader := r.Header.Get("Authorization")
@@ -120,12 +119,19 @@ func bearerAuth(next http.Handler, cookieCSRFScope string) http.Handler {
 			return
 		}
 
-		// --- Fallback to Cookie-based session for browser clients ---
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			if cookieCSRFScope == "" || !ValidateSessionXSRF(r, cookieCSRFScope) {
-				http.Error(w, "CSRF token required for cookie-authenticated writes", http.StatusForbidden)
-				return
-			}
+		if !allowAdminCookie {
+			logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "Bearer token required", "path", r.URL.Path, "ip", ip)
+			http.Error(w, "Unauthorized: Bearer token required", http.StatusUnauthorized)
+			return
+		}
+
+		// Only the first-party admin UI may authenticate via a browser cookie.
+		// CrossOriginProtection and the signed xsrftoken are complementary:
+		// the former checks browser origin signals, the latter binds mutations
+		// to the authenticated session even when origin headers are absent.
+		if isUnsafeMethod(r.Method) && !ValidateSessionXSRF(r, config.Paths.Admin) {
+			http.Error(w, "CSRF token required for cookie-authenticated writes", http.StatusForbidden)
+			return
 		}
 		cookie, err := r.Cookie("auth_token")
 		if err != nil {

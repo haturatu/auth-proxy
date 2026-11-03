@@ -44,12 +44,12 @@ The Go proxy traverses X-Forwarded-For from right to left while the current peer
 - Browser forms require a 15-minute signed XSRF token bound to an anonymous cookie or authenticated session. Do not remove the `anon_xsrf` cookie on login pages.
 - Go `CrossOriginProtection` rejects unsafe cross-origin browser requests to auth UI and admin API, not to arbitrary upstream/proxied paths.
 - A cookie-authenticated mutation to the admin API additionally requires the XSRF token issued by the admin page. The existing JavaScript uses `X-XSRF-Token` for this.
-- Generic proxied API writes that use `BearerAuth` require a Bearer token; cookie fallback is only allowed for safe read methods. This is a deliberate tightening of behavior.
+- Generic proxied APIs using `BearerAuth` require a Bearer token for **every** method, including GET and HEAD. No cookie fallback is provided. The admin API remains the only API endpoint that accepts browser-session cookies and requires an XSRF token for unsafe methods.
 - `CSRF_TRUSTED_ORIGINS` is an optional **exact** comma-separated list of additional browser origins, such as `http://192.168.20.10:8080`, for deliberate cross-origin access. It is NOT a source-IP allowlist, CORS configuration, or an authentication bypass. Same-origin direct VLAN usage needs no entry.
 
 ## Secrets and passwords
 
-`SESSION_SECRET` must be at least 32 bytes of high-entropy data; missing/short values fail startup. Use `openssl rand -base64 48`. JWT HS256 signing uses `crypto/hkdf` (context `auth-proxy/jwt-hs256/v1`). New JWTs cannot be validated by old builds. During rollout, set `JWT_ACCEPT_LEGACY_SIGNATURE=true` only long enough for earlier access JWTs to expire, then turn it off. Keep the previous SESSION_SECRET during that window.
+`SESSION_SECRET` must be at least 32 bytes of high-entropy data; missing/short values fail startup. Use `openssl rand -base64 48`. JWT HS256 signing uses `crypto/hkdf` (context `auth-proxy/jwt-hs256/v1`). All previously issued JWT access tokens signed with the raw `SESSION_SECRET` are immediately invalidated after upgrading. There is deliberately no legacy-signature fallback, migration flag, or grace period. Clients must sign in again to obtain fresh JWT access/refresh credentials.
 
 `XSRF_SECRET_KEY` remains an independent 32-byte base64-encoded random secret: `openssl rand -base64 32`.
 
@@ -62,3 +62,7 @@ Auth/admin request bodies are limited to 64 KiB; upstream proxying remains strea
 ## Exclusions
 
 FIPS 140-3, ML-KEM, and ML-DSA are intentionally not added.
+
+## Breaking changes by design
+
+This hardening intentionally does **not** offer a compatibility mode for old JWT signing keys or cookie-authenticated proxied APIs. Redeploy clients with Bearer tokens and sign in again as needed. This does not change the separate browser admin session, the signed `xsrftoken` protection, or the explicit requirement for direct HTTP access from another VLAN.
