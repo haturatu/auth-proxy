@@ -134,6 +134,30 @@ func TestSessionAPIOriginModeAllowsSameOriginMutation(t *testing.T) {
 	}
 }
 
+func TestEitherModeRejectsBasicInsteadOfFallingBackToCookie(t *testing.T) {
+	session, _ := setupBrowserSession(t)
+	for _, authorization := range []string{
+		"Basic Zm9vOmJhcg==",
+		"Bearer invalid",
+		"Bearer",
+	} {
+		t.Run(authorization, func(t *testing.T) {
+			h := APIAuth("either", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatal("an invalid Authorization header must never reach upstream")
+			}))
+			req := httptest.NewRequest(http.MethodGet, "http://localhost/api/private", nil)
+			req.AddCookie(&http.Cookie{Name: "auth_token", Value: session})
+			req.Header.Set("Authorization", authorization)
+			req.Header.Set("Sec-Fetch-Site", "same-origin")
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("got %d for Authorization %q, want 401", rec.Code, authorization)
+			}
+		})
+	}
+}
+
 func TestAPIAuthModeSelection(t *testing.T) {
 	session, _ := setupBrowserSession(t)
 	for _, tc := range []struct {

@@ -13,7 +13,7 @@ API_AUTH_MODE=session
 
 - `bearer` (default): only `Authorization: Bearer <access JWT>`, for CLI/batch/services.
 - `session`: only an `auth_token` HttpOnly session cookie, for browser apps without custom Authorization headers.
-- `either`: valid Bearer JWT if Authorization is present; otherwise a checked browser session cookie. Invalid Authorization **never** falls back to the cookie.
+- `either`: valid Bearer JWT if Authorization is present; otherwise a checked browser session cookie. Invalid Authorization **never** falls back to the cookie. This includes `Authorization: Basic ...` or malformed Bearer headers: the API returns 401 even with a valid browser session. Reverse proxies must not inject conflicting `Authorization` headers into browser API requests.
 
 `PROTECT_API=false` does **not** protect `/api/` even if frontend protection is enabled. The server refuses `API_AUTH_MODE=session` or `either` when `PROTECT_API=false`.
 
