@@ -49,7 +49,7 @@ The Go proxy traverses X-Forwarded-For from right to left while the current peer
 
 ## Secrets and passwords
 
-`SESSION_SECRET` must be at least 32 bytes of high-entropy data; missing/short values fail startup. Use `openssl rand -base64 48`. JWT HS256 signing uses `crypto/hkdf` (context `auth-proxy/jwt-hs256/v1`). All previously issued JWT access tokens signed with the raw `SESSION_SECRET` are immediately invalidated after upgrading. There is deliberately no legacy-signature fallback, migration flag, or grace period. Clients must sign in again to obtain fresh JWT access/refresh credentials.
+`SESSION_SECRET` must be at least 32 bytes of high-entropy data; missing/short values fail startup. Use `openssl rand -base64 48`. JWT HS256 signing uses `crypto/hkdf` (context `auth-proxy/jwt-hs256/v1`). All previously issued JWT access tokens signed with the raw `SESSION_SECRET` are immediately invalidated after upgrading. There is deliberately no legacy-signature fallback, migration flag, or grace period. Clients must obtain a newly signed access JWT. Database-backed refresh tokens are a separate mechanism and may still be exchangeable; explicitly revoke them in the database if all sessions must be invalidated.
 
 `XSRF_SECRET_KEY` remains an independent 32-byte base64-encoded random secret: `openssl rand -base64 32`.
 
