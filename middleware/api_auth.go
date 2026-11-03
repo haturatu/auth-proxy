@@ -3,11 +3,8 @@ package middleware
 import (
 	"auth-proxy/config"
 	"auth-proxy/logging"
-	"auth-proxy/models"
-	"auth-proxy/types"
-	"context"
-	"database/sql"
 	"encoding/json"
+    "errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -55,26 +52,20 @@ func SessionAPIAuth(next http.Handler) http.Handler {
 			writeAPIError(w, r, http.StatusForbidden, "CSRF token required")
 			return
 		}
-		cookie, err := r.Cookie("auth_token")
-		if err != nil || cookie.Value == "" {
-			writeAPIError(w, r, http.StatusUnauthorized, "authentication required")
+		user, err := resolveSessionUser(r)
+		if err != nil {
+			switch {
+			case errors.Is(err, ErrMissingSession):
+				writeAPIError(w, r, http.StatusUnauthorized, "authentication required")
+			case errors.Is(err, ErrInvalidSession):
+				expireSessionCookie(w, r)
+				writeAPIError(w, r, http.StatusUnauthorized, "invalid session")
+			default:
+				writeAPIError(w, r, http.StatusInternalServerError, "session lookup failed")
+			}
 			return
 		}
-		user, err := models.GetUserByToken(cookie.Value)
-		if err != nil && err != sql.ErrNoRows {
-			writeAPIError(w, r, http.StatusInternalServerError, "session lookup failed")
-			return
-		}
-		if user == nil || !user.IsActive {
-			http.SetCookie(w, &http.Cookie{
-				Name: "auth_token", Path: "/", MaxAge: -1,
-				HttpOnly: true, Secure: CookieSecure(r), SameSite: http.SameSiteLaxMode,
-			})
-			writeAPIError(w, r, http.StatusUnauthorized, "invalid session")
-			return
-		}
-		ctx := context.WithValue(r.Context(), types.SessionDataContextKey, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, sessionUserRequest(r, user))
 	})
 }
 
