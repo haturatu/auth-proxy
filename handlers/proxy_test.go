@@ -12,6 +12,11 @@ func TestReverseProxyRejectsForgedIdentityHeaders(t *testing.T) {
 	workerPool = &types.WorkerPool{TaskQueue: make(chan func(), 8)}
 	t.Cleanup(func() { workerPool = old })
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, name := range []string{"Forwarded", "X-Real-IP", "X-Forwarded-Port", "X-Forwarded-Prefix", "X-Original-URL", "X-Rewrite-URL"} {
+			if value := r.Header.Get(name); value != "" {
+				t.Errorf("forged %s=%q reached upstream", name, value)
+			}
+		}
 		if r.Header.Get("X-Username") != "" || r.Header.Get("X-User-Role") != "" {
 			t.Error("forged identity forwarded")
 		}
@@ -23,6 +28,9 @@ func TestReverseProxyRejectsForgedIdentityHeaders(t *testing.T) {
 	defer upstream.Close()
 	req := httptest.NewRequest("GET", "http://192.168.10.5:8080/data", nil)
 	req.RemoteAddr = "192.168.20.10:4321"
+	for _, name := range []string{"Forwarded", "X-Real-IP", "X-Forwarded-Port", "X-Forwarded-Prefix", "X-Original-URL", "X-Rewrite-URL"} {
+		req.Header.Set(name, "6.6.6.6")
+	}
 	req.Header.Set("X-Username", "admin")
 	req.Header.Set("X-User-Role", "admin")
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")

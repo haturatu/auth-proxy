@@ -31,6 +31,18 @@ func NewProxy(targetURL string) http.Handler {
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(target)
+			// Never propagate forwarding metadata provided by untrusted callers.
+			// Reconstruct only the canonical headers after stripping every
+			// forwarding variant, including RFC 7239 and X-Real-IP.
+			for name := range pr.Out.Header {
+				lower := strings.ToLower(name)
+				if lower == "forwarded" || lower == "x-real-ip" ||
+					strings.HasPrefix(lower, "x-forwarded-") ||
+					lower == "x-original-url" || lower == "x-rewrite-url" ||
+					strings.HasPrefix(lower, "x-envoy-") {
+					pr.Out.Header.Del(name)
+				}
+			}
 			pr.SetXForwarded()
 			pr.Out.Header.Set("X-Forwarded-For", logging.GetClientIP(pr.In))
 			pr.Out.Header.Set("X-Forwarded-Proto", logging.GetClientScheme(pr.In))
