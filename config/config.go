@@ -57,7 +57,7 @@ func Init() {
 		Assets:          getEnv("AUTH_ASSETS_PATH", "/assets"),
 		FrontPath:       getEnv("FRONT_PATH", "/"),
 		APIPath:         getEnv("API_PATH", "/api/"),
-		APIAuthMode:     getEnv("API_AUTH_MODE", "bearer"),
+		APIAuthMode:     strings.ToLower(strings.TrimSpace(getEnv("API_AUTH_MODE", "bearer"))),
 		APISessionCSRF:  strings.ToLower(getEnv("API_SESSION_CSRF", "origin")),
 
 		// Booleans
