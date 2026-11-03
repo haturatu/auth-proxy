@@ -58,6 +58,9 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: '**/go.sum'
 
+      - name: Run Go tests
+        run: go test ./...
+
       - name: Run build
         run: go build -o auth-proxy-server ./cmd/server && go build -o admin-cli ./cmd/admin-cli
 
