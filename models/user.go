@@ -4,20 +4,50 @@ import (
 	"auth-proxy/database"
 	"auth-proxy/types"
 	"database/sql"
+	"crypto/rand"
+	"crypto/pbkdf2"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HashPassword generates a bcrypt hash of the password
+// HashPassword defaults to the existing bcrypt format for compatibility.
+// PBKDF2 is an explicitly opt-in standard-library alternative, not a forced migration.
+const pbkdf2Iterations = 600000
 func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
+	if os.Getenv("PASSWORD_HASH_ALGORITHM") != "pbkdf2-sha256" {
+		bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+		return string(bytes), err
+	}
+	var salt [16]byte
+	if _, err := rand.Read(salt[:]); err != nil { return "", err }
+	key, err := pbkdf2.Key(sha256.New, password, salt[:], pbkdf2Iterations, 32)
+	if err != nil { return "", err }
+	return fmt.Sprintf("$pbkdf2-sha256$%d$%s$%s", pbkdf2Iterations,
+		base64.RawStdEncoding.EncodeToString(salt[:]), base64.RawStdEncoding.EncodeToString(key)), nil
 }
 
-// CheckPasswordHash compares a password with a hash
+// CheckPasswordHash handles both the old bcrypt hashes and optional PBKDF2 hashes.
 func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
+	if !strings.HasPrefix(hash, "$pbkdf2-sha256$") {
+		return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+	}
+	parts := strings.Split(hash, "$")
+	if len(parts)!=5 || parts[1]!="pbkdf2-sha256" { return false }
+	iterations,err := strconv.Atoi(parts[2])
+	if err!=nil || iterations<100000 || iterations>2000000 { return false }
+	salt,err:=base64.RawStdEncoding.DecodeString(parts[3])
+	if err!=nil || len(salt)!=16 { return false }
+	want,err:=base64.RawStdEncoding.DecodeString(parts[4])
+	if err!=nil || len(want)!=32 { return false }
+	got,err:=pbkdf2.Key(sha256.New, password, salt, iterations, 32)
+	return err==nil && subtle.ConstantTimeCompare(got,want)==1
 }
 
 // CreateUser creates a new user in the database
