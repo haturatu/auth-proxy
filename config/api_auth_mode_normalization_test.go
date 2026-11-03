@@ -18,7 +18,9 @@ func TestAPIAuthModeCanonicalization(t *testing.T) {
 	} {
 		t.Run(tc.want, func(t *testing.T) {
 			t.Setenv("API_AUTH_MODE", tc.input)
-			if err := Validate(); err != nil { t.Fatal(err) }
+			if err := Validate(); err != nil {
+				t.Fatal(err)
+			}
 			Init()
 			if Paths.APIAuthMode != tc.want {
 				t.Fatalf("%q normalized to %q, want %q", tc.input, Paths.APIAuthMode, tc.want)
