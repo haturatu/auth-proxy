@@ -1,4 +1,6 @@
-Security and direct-VLAN deployment details: [SECURITY.md](SECURITY.md).\n\n<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md).
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
@@ -63,6 +65,8 @@ Security and direct-VLAN deployment details: [SECURITY.md](SECURITY.md).\n\n<!--
   While integrating authentication into every application is good for security, it's a hassle to manage separate IDs and passwords for each one. This is a common problem for self-hosting enthusiasts who need a centralized way to control access.
   This project aims to solve that by acting as a central authentication service. By referencing the same database, user information can be shared across different applications.
   
+  Docker Compose supports SQLite (default), PostgreSQL, MySQL and external SQL servers. See the [Docker deployment guide](docs/docker.md).
+
   ## Features
   
   - **Authentication**: Provides login, logout, and registration pages.
@@ -131,7 +135,7 @@ Security and direct-VLAN deployment details: [SECURITY.md](SECURITY.md).\n\n<!--
   
   For API requests, the client must include the JWT Access Token in the `Authorization: Bearer <token>` header. A middleware on the server validates the token's signature and expiration time. This process is stateless, meaning it does not require a database lookup for every request, making it highly efficient. If the access token has expired, the client can use the refresh token to request a new access token without re-authenticating.
   
-  **Note on Authentication Precedence:** When an API endpoint is protected (i.e., `PROTECT_API=true`), the middleware first looks for an `Authorization: Bearer` header. If this header is not present, it will fall back to validating the `auth_token` session cookie. This allows users who are logged into the web UI to also authenticate to the API using their browser session, but it means that API endpoints are accessible via either a valid JWT or a valid session cookie.
+  **Authentication:** With `PROTECT_API=true`, all proxied API methods require a Bearer JWT; cookie fallback is disabled. Cookie + XSRF authentication is restricted to the first-party admin API.
   
   ### Transport Layer Security (HTTPS)
   

@@ -21,6 +21,7 @@ type PathConfig struct {
 	APIPath         string
 
 	// Booleans
+	CookieSecure    bool
 	ProtectFrontend bool
 	ProtectAPI      bool
 	RegisterEnabled bool

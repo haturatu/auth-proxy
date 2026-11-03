@@ -6,9 +6,12 @@ import (
 	"auth-proxy/logging"
 	"auth-proxy/models"
 	"auth-proxy/utils"
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -24,8 +27,22 @@ func main() {
 	config.Init()
 
 	username := flag.String("username", "", "Username for the new admin user")
-	password := flag.String("password", "", "Password for the new admin user")
+	password := flag.String("password", "", "Password for the new admin user (visible in process arguments)")
+	passwordStdin := flag.Bool("password-stdin", false, "Read the password from standard input")
 	flag.Parse()
+
+	if *passwordStdin {
+		if *password != "" {
+			logging.AppLog.Error("--password and --password-stdin cannot be combined")
+			os.Exit(1)
+		}
+		line, err := bufio.NewReader(io.LimitReader(os.Stdin, 4096)).ReadString('\n')
+		if err != nil && err != io.EOF {
+			logging.AppLog.Error("Could not read admin password", "error", err)
+			os.Exit(1)
+		}
+		*password = strings.TrimRight(line, "\r\n")
+	}
 
 	if *username == "" || *password == "" {
 		logging.AppLog.Error("Both --username and --password flags are required")

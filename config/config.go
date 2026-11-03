@@ -58,6 +58,7 @@ func Init() {
 		APIPath:         getEnv("API_PATH", "/api/"),
 
 		// Booleans
+		CookieSecure:    getEnvAsBool("COOKIE_SECURE", true),
 		ProtectFrontend: getEnvAsBool("PROTECT_FRONTEND", false),
 		ProtectAPI:      getEnvAsBool("PROTECT_API", false),
 		RegisterEnabled: getEnvAsBool("REGISTER", true),

@@ -37,6 +37,11 @@ jobs:
               - 'go.mod'
               - 'go.sum'
               - 'run-demo.sh'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'compose*.yaml'
+              - 'tests/**'
+              - '.env.example'
               - '.github/workflows/ci.yml'
   build:
     needs: changes
@@ -52,6 +57,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: '**/go.sum'
+
+      - name: Run Go tests
+        run: go test ./...
 
       - name: Run build
         run: go build -o auth-proxy-server ./cmd/server && go build -o admin-cli ./cmd/admin-cli
@@ -85,6 +93,27 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  docker:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    name: Docker / SQLite, PostgreSQL, MySQL smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build application image once
+        env:
+          TARGET_URL: http://example.invalid
+          SESSION_SECRET: ci-only-session-secret-not-for-production
+          XSRF_SECRET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          COMPOSE_PROJECT_NAME: auth-proxy-smoke
+        run: docker compose -f compose.yaml build auth-proxy
+      - name: Smoke test all database modes
+        run: |
+          for db in sqlite postgres mysql; do
+            bash tests/compose-smoke.sh "$db"
+          done
 
   test:
     needs: changes

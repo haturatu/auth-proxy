@@ -8,6 +8,7 @@ import (
 	"auth-proxy/middleware"
 	"auth-proxy/router"
 	"auth-proxy/worker"
+	"context"
 	"net/http"
 	"os"
 	"time"
@@ -16,69 +17,56 @@ import (
 )
 
 func main() {
-	// Initialize loggers
 	logging.InitLoggers()
 
-	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		logging.AppLog.Info("No .env file found, using environment variables")
 	}
-
-	// Initialize path configurations
 	config.Init()
-
-	// Initialize database
-	database.InitDB()
-	defer database.CloseDB()
-
-	// Initialize and start the worker pool
-	pool := worker.NewWorkerPool()
-	defer worker.Close(pool)
-	handlers.SetWorkerPool(pool)
-
-	// --- Secret Key Validation ---
-	sessionSecret := os.Getenv("SESSION_SECRET")
-	if len(sessionSecret) < 32 {
-		logging.AppLog.Error("SESSION_SECRET must contain at least 32 bytes of random data")
+	if err := config.Validate(); err != nil {
+		logging.AppLog.Error("Invalid configuration", "error", err)
 		os.Exit(1)
 	}
+
+	// Only honor forwarded headers from explicitly configured proxy peers.
+	// Direct clients on another VLAN require no trusted CIDR.
 	if err := logging.ConfigureTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
 		logging.AppLog.Error("Invalid TRUSTED_PROXY_CIDRS", "error", err)
 		os.Exit(1)
 	}
-	xsrfSecret := os.Getenv("XSRF_SECRET_KEY")
-	if xsrfSecret == "" {
-		logging.AppLog.Error("XSRF_SECRET_KEY environment variable not set")
-		os.Exit(1)
-	}
 
-	// Get target URL for proxy
-	targetURL := os.Getenv("TARGET_URL")
-	if targetURL == "" {
-		logging.AppLog.Error("TARGET_URL environment variable not set")
-		os.Exit(1)
-	}
+	database.InitDB()
+	defer database.CloseDB()
 
-	// Create the main handler
+	pool := worker.NewWorkerPool()
+	defer worker.Close(pool)
+	handlers.SetWorkerPool(pool)
+
 	rateLimiter := middleware.NewRateLimiter()
 	mainRouter := router.NewRouter(rateLimiter)
-
-	// Start periodic background tasks
 	go router.StartBackgroundTasks(pool, rateLimiter)
 
-	// Get server port
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := database.DB.PingContext(ctx); err != nil {
+			http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.Handle("/", mainRouter)
+
 	port := os.Getenv("LISTEN_PORT")
 	if port == "" {
 		port = "8080"
 	}
 	listenAddr := ":" + port
-
-	// --- Start Server ---
 	logging.AppLog.Info("Server starting on " + listenAddr)
-
 	srv := &http.Server{
 		Addr:                listenAddr,
-		Handler:             mainRouter,
+		Handler:             mux,
 		ReadHeaderTimeout:   5 * time.Second,
 		IdleTimeout:         60 * time.Second,
 		MaxHeaderBytes:      32 << 10,
