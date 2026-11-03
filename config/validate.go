@@ -63,7 +63,7 @@ func Validate() error {
 		}
 	}
 
-	mode := os.Getenv("API_AUTH_MODE")
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("API_AUTH_MODE")))
 	switch mode {
 	case "", "bearer":
 	case "session", "either":
