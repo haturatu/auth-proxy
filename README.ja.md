@@ -1,5 +1,7 @@
 セキュリティ設定（VLAN間の直接アクセスを含む）: [SECURITY.md](SECURITY.md)。
 
+[English](README.md)
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
@@ -16,13 +18,13 @@
       - [2. API（JWTベース）](#2-apijwt%E3%83%99%E3%83%BC%E3%82%B9)
     - [セッション管理](#%E3%82%BB%E3%83%83%E3%82%B7%E3%83%A7%E3%83%B3%E7%AE%A1%E7%90%86)
       - [Web UIセッション](#web-ui%E3%82%BB%E3%83%83%E3%82%B7%E3%83%A7%E3%83%B3)
-      - [APIセッション（JWTによるステートレス管理）](#api%E3%82%BB%E3%83%83%E3%82%B7%E3%83%A7%E3%83%B3jwt%E3%81%AB%E3%82%88%E3%82%8B%E3%82%B9%E3%83%86%E3%83%BC%E3%83%88%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86)
+      - [APIセッション（JWTアクセストークン）](#api%E3%82%BB%E3%83%83%E3%82%B7%E3%83%A7%E3%83%B3jwt%E3%82%A2%E3%82%AF%E3%82%BB%E3%82%B9%E3%83%88%E3%83%BC%E3%82%AF%E3%83%B3)
     - [トランスポート層セキュリティ（HTTPS）](#%E3%83%88%E3%83%A9%E3%83%B3%E3%82%B9%E3%83%9D%E3%83%BC%E3%83%88%E5%B1%A4%E3%82%BB%E3%82%AD%E3%83%A5%E3%83%AA%E3%83%86%E3%82%A3https)
   - [はじめに](#%E3%81%AF%E3%81%98%E3%82%81%E3%81%AB)
     - [前提条件](#%E5%89%8D%E6%8F%90%E6%9D%A1%E4%BB%B6)
     - [インストール](#%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB)
     - [設定](#%E8%A8%AD%E5%AE%9A)
-- [`.env` ファイルの例:](#env-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%81%AE%E4%BE%8B)
+      - [`.env` ファイルの例](#env-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%81%AE%E4%BE%8B)
     - [フロントエンドの選択](#%E3%83%95%E3%83%AD%E3%83%B3%E3%83%88%E3%82%A8%E3%83%B3%E3%83%89%E3%81%AE%E9%81%B8%E6%8A%9E)
       - [PHPフロントエンドのセットアップ](#php%E3%83%95%E3%83%AD%E3%83%B3%E3%83%88%E3%82%A8%E3%83%B3%E3%83%89%E3%81%AE%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97)
     - [データベース設定例](#%E3%83%87%E3%83%BC%E3%82%BF%E3%83%99%E3%83%BC%E3%82%B9%E8%A8%AD%E5%AE%9A%E4%BE%8B)
@@ -38,6 +40,9 @@
     - [ユーザーステータスの更新](#%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%82%B9%E3%83%86%E3%83%BC%E3%82%BF%E3%82%B9%E3%81%AE%E6%9B%B4%E6%96%B0)
     - [ユーザーの削除](#%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%AE%E5%89%8A%E9%99%A4)
   - [設定詳細](#%E8%A8%AD%E5%AE%9A%E8%A9%B3%E7%B4%B0)
+  - [セキュリティ上の注意](#%E3%82%BB%E3%82%AD%E3%83%A5%E3%83%AA%E3%83%86%E3%82%A3%E4%B8%8A%E3%81%AE%E6%B3%A8%E6%84%8F)
+    - [ログアウトエンドポイント](#%E3%83%AD%E3%82%B0%E3%82%A2%E3%82%A6%E3%83%88%E3%82%A8%E3%83%B3%E3%83%89%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88)
+    - [パスワード変更時の認証情報失効](#%E3%83%91%E3%82%B9%E3%83%AF%E3%83%BC%E3%83%89%E5%A4%89%E6%9B%B4%E6%99%82%E3%81%AE%E8%AA%8D%E8%A8%BC%E6%83%85%E5%A0%B1%E5%A4%B1%E5%8A%B9)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -85,7 +90,7 @@ Docker Compose で SQLite（標準）・PostgreSQL・MySQL・外部 DB を切り
 
 ### XSRF保護
 
-このプロキシには、悪意のある攻撃を防ぐためのXSRF（クロスサイトリクエストフォージェリ）保護が含まれています。これは`golang.org/x/net/xsrftoken`ライブラリを使用して実装されています。
+このプロキシには、悪意のある攻撃を防ぐためのXSRF（クロスサイトリクエストフォージェリ）保護が含まれています。これは`github.com/haturatu/xsrftoken`ライブラリを使用して実装されています。
 
 ユーザーがフォームのあるページにアクセスすると、一意のXSRFトークンが生成され、フォームに埋め込まれます。フォームが送信されると、サーバーはトークンがユーザーのセッションに保存されているものと一致するかどうかを確認します。一致しない場合、リクエストは拒否されます。
 
@@ -126,9 +131,9 @@ Docker Compose で SQLite（標準）・PostgreSQL・MySQL・外部 DB を切り
 
 ブラウザからの後続のリクエストでは、`auth_token`クッキーが自動的にサーバーに送信されます。ミドルウェアがこのトークンをデータベースで検索して検証します。トークンが有効で期限切れでなければ、リクエストは認証され、処理が続行されます。ユーザーがログアウトすると、セッショントークンはデータベースから削除され、セッションが無効になります。
 
-#### APIセッション（JWTによるステートレス管理）
+#### APIセッション（JWTアクセストークン）
 
-APIリクエストの場合、クライアントは`Authorization: Bearer <token>`ヘッダーにJWTアクセストークンを含める必要があります。サーバー上のミドルウェアが、トークンの署名と有効期限を検証します。このプロセスはステートレスであり、リクエストごとにデータベースを検索する必要がないため、非常に効率的です。アクセストークンが期限切れになった場合、クライアントはリフレッシュトークンを使用して、再認証することなく新しいアクセストークンを要求できます。
+APIリクエストの場合、クライアントは`Authorization: Bearer <token>`ヘッダーにJWTアクセストークンを含める必要があります。サーバー上のミドルウェアが、トークンの署名と有効期限を検証します。JWTの検証後にユーザー情報をDBから取得するため、認証処理は完全なステートレスではありません。アクセストークンが期限切れになった場合、クライアントはリフレッシュトークンを使用して、再認証することなく新しいアクセストークンを要求できます。
 
 **認証:** `PROTECT_API=true` のとき、`API_AUTH_MODE=bearer` が標準（Bearer JWT必須）です。ブラウザのSSE／WebSocket／APIにCookie認証を使う場合は `session`、BearerとCookieの両方を許可する場合は `either` を明示指定します。Cookie認証では同一オリジン検証を行い、`API_SESSION_CSRF=origin`（標準）では既存SPAを変更せずにunsafeメソッドを保護します。`xsrf` にすると `/api/auth/csrf` のトークンも必須になります。[ブラウザAPI認証ガイド](docs/browser-session-auth.md) を参照してください。
 
@@ -144,7 +149,7 @@ APIリクエストの場合、クライアントは`Authorization: Bearer <token
 
 ### 前提条件
 
-- Go 1.21 以降
+- Go 1.27.3 以降（`go.mod` を参照）
 - (任意) PHPフロントエンドを使用する場合は、実行中のPHP-FPMサービス。
 - (任意) PostgreSQL または MySQL データベースサーバー。
 
@@ -170,7 +175,7 @@ APIリクエストの場合、クライアントは`Authorization: Bearer <token
 
 設定はプロジェクトのルートにある `.env` ファイルで管理されます。`.env` という名前のファイルを作成し、必要な変数を追加してください。
 
-# `.env` ファイルの例:
+#### `.env` ファイルの例
 
 ```dotenv
 # --- サーバー設定 ---
@@ -182,8 +187,8 @@ LISTEN_PORT=8080
 TARGET_URL=http://localhost:8081
 
 # セッションクッキーとJWTを保護するための長くてランダムな文字列
-# 本番環境では、openssl rand -base64 45 を使って新しいキーを生成してください
-SESSION_SECRET= # Generate with: openssl rand -base64 48
+# 本番環境では openssl rand -base64 48 で生成してください
+SESSION_SECRET=
 
 # (必須) XSRF保護のための32バイトのランダムなキー。
 # 生成コマンド: openssl rand -base64 32
@@ -195,7 +200,7 @@ XSRF_SECRET_KEY=
 # オプション1: PostgreSQL または MySQL (推奨)
 # 例: postgres://user:password@host:port/dbname?sslmode=disable
 # 例: mysql://user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=true
-DATABASE_URL=mysql://test:test@127.0.0.1:3306/auth
+# DATABASE_URL=mysql://test:test@127.0.0.1:3306/auth
 
 # オプション2: SQLite (DATABASE_URLが設定されていない場合のデフォルト)
 # DATABASE_PATH=./auth.db
@@ -205,8 +210,10 @@ DATABASE_URL=mysql://test:test@127.0.0.1:3306/auth
 FRONTEND_TYPE=js
 # trueの場合、フロントエンドパスをセッション認証で保護します
 PROTECT_FRONTEND=true
-# trueの場合、APIパスをベアラートークン認証で保護します
+# trueの場合、APIパスをAPI_AUTH_MODEで認証します
 PROTECT_API=true
+API_AUTH_MODE=bearer
+API_SESSION_CSRF=origin
 # 保護対象のフロントエンドのベースパス
 # 保護対象のAPIのベースパス
 API_PATH=/api/
@@ -409,7 +416,7 @@ Authorization: Bearer <access_token>
 
 `PROTECT_API=true` の場合、`API_PATH`（例: `/api/`）以下のパスへのリクエストのうち、内部の管理エンドポイントではないものは、認証された上でバックエンドの `TARGET_URL` へとプロキシされます。
 
-これにより、独自のバックエンドAPIを同じ認証メカニズムで保護することができます。認証は、有効な `Authorization: Bearer` トークン、またはフォールバックとして有効なWebセッションクッキーのいずれかを使用して検証されます。
+これにより、独自のバックエンドAPIを同じ認証メカニズムで保護することができます。標準の `API_AUTH_MODE=bearer` ではBearer JWTのみを受け付けます。ブラウザのCookie認証には `session`、両方の認証には `either` を指定します。不正なAuthorizationヘッダーからCookieへのフォールバックは行いません。
 
 **保護されたバックエンドAPIへの `curl` の例:**
 
@@ -425,7 +432,7 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 
 ## 管理APIエンドポイント
 
-管理タスクのために、プロキシはプログラムからアクセス可能なAPIエンドポイントをいくつか提供しています。これらのエンドポイントはすべて、`admin`ロールを持つユーザーの有効なベアラートークンが必要です。
+管理タスクのために、プロキシはプログラムからアクセス可能なAPIエンドポイントをいくつか提供しています。これらのエンドポイントは `admin` ロールが必要です。Bearer JWTに加え、管理画面はCookieセッションでも認証でき、変更系の操作では署名付きXSRFトークンが必要です。
 
 これらのエンドポイントのベースパスは `/api/admin/users` であり、これは `AUTH_PATH_ADMIN_USERS_API` 環境変数でカスタマイズ可能です。
 
@@ -517,7 +524,7 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 | 環境変数 | 説明 | デフォルト値 |
 | --- | --- | --- |
 | `TARGET_URL` | **(必須)** プロキシ先のバックエンドサービスのURL。 | - |
-| `SESSION_SECRET` | **(必須)** セッションクッキーの暗号化とJWTの署名に使用する、長くてランダムな秘密鍵。 | `default-secret-key-for-dev` |
+| `SESSION_SECRET` | **(必須)** 32文字以上のランダムな秘密鍵。JWT署名鍵はHKDFで導出されます。 | - |
 | `DATABASE_URL` | PostgreSQLまたはMySQLの接続文字列。設定されている場合、`DATABASE_PATH`より優先されます。 | - |
 | `DATABASE_PATH` | SQLiteデータベースのファイルパス。`DATABASE_URL`が設定されていない場合のみ使用されます。 | `./auth.db` |
 | `LOG_LEVEL` | ログレベルを設定します。`DEBUG`, `INFO`, `WARN`, `ERROR`が指定できます。 | `INFO`                 |
@@ -533,13 +540,25 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 | `TOKEN_DURATION_HOURS` | Webセッションクッキーの有効期間（時間）。 | `24` |
 | `ACCESS_TOKEN_DURATION_MINUTES` | APIクライアント用のJWTアクセストークンの有効期間（分）。 | `15` |
 | `REFRESH_TOKEN_DURATION_DAYS` | APIクライアント用のJWTリフレッシュトークンの有効期間（日）。 | `7` |
-| `PROTECT_FRONTEND` | `true`の場合、すべてのフロントエンドパスをセッション認証経由でプロキシします。 | `false` |
-| `PROTECT_API` | `true`の場合、すべてのAPIパスをベアラートークン認証経由でプロキシします。 | `false` |
+| `PROTECT_FRONTEND` | `true`の場合、フロントエンドのプロキシ先をセッション認証で保護します。 | `true` |
+| `PROTECT_API` | `true`の場合、APIプロキシを `API_AUTH_MODE` で認証します。 | `true` |
+| `API_AUTH_MODE` | `bearer`、`session`、`either` から選択します。 | `bearer` |
+| `API_SESSION_CSRF` | `origin` またはより厳格な `xsrf`。 | `origin` |
 | `API_PATH` | `PROTECT_API`で保護されるAPIルートのベースパス。 | `/api/` |
 | `REGISTER` | `false`に設定すると、新規ユーザー登録を無効にします。 | `true` |
 | `AUTH_PATH_*` | ログイン、管理者ページなどの内部URLをカスタマイズするための変数セット。 | 様々、例: `/login`|
 | `AUTH_ASSETS_PATH` | 内部静的アセット（CSS, JS）を提供するためのURLパス。 | `/assets` |
-| `ENV` | ランタイム環境。セキュアなクッキーを有効にするには`production`に設定します。 | - |
+| `COOKIE_SECURE` | `true`、`false`、`auto`。Composeでは `true` です。 | `auto`（単体起動） |
 | `XSRF_SECRET_KEY` | **(必須)** XSRF保護のための32バイトのランダムなキー。`openssl rand -base64 32` で生成します。 | - |
 
-> Never copy a fixed `SESSION_SECRET` from documentation into a live deployment. Generate a unique secret with `openssl rand -base64 48` and set it in `.env` or your secrets manager. Startup refuses secrets shorter than 32 bytes.
+## セキュリティ上の注意
+
+> 固定の `SESSION_SECRET` をコピーして使わないでください。`openssl rand -base64 48` で環境ごとに生成して管理してください。32文字未満だと起動できません。
+
+### ログアウトエンドポイント
+
+ログアウトはXSRFトークン付きの `POST` で行います。`GET /logout` は `405 Method Not Allowed` を返します。
+
+### パスワード変更時の認証情報失効
+
+パスワードを変更するとDB上のブラウザセッションとリフレッシュトークンが失効し、Cookieも削除されます。アクセストークンも次の認証リクエストで無効化され、`cv` がない旧JWTも拒否されます。
