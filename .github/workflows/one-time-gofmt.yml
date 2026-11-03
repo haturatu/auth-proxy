@@ -1,0 +1,28 @@
+name: One-time format on fix/issue-16-remove-result-channel
+
+on:
+  push:
+    branches:
+      - 'fix/issue-16-remove-result-channel'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Format and remove temporary workflow
+        run: |
+          gofmt -w .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          git rm .github/workflows/one-time-gofmt.yml
+          git diff --cached --quiet || git commit -m "style: gofmt source and remove temporary formatter"
+          git push origin HEAD:fix/issue-16-remove-result-channel
