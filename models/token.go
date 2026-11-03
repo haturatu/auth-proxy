@@ -6,7 +6,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-    "errors"
+	"errors"
 	"time"
 )
 
@@ -138,27 +138,43 @@ var ErrRefreshTokenSpent = errors.New("refresh token already consumed or expired
 // The conditional UPDATE is the concurrency gate: at most one transaction may
 // successfully consume the old token across multiple proxy instances.
 func RotateRefreshToken(oldToken string, userID int64, duration time.Duration) (*types.RefreshToken, error) {
-    raw, err := GenerateSecureToken(32)
-    if err != nil { return nil, err }
-    now := time.Now()
-    expiresAt := now.Add(duration)
-    tx, err := database.DB.Begin()
-    if err != nil { return nil, err }
-    defer tx.Rollback() //nolint:errcheck
-    consume := database.Rebind("UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = ? AND user_id = ? AND is_revoked = FALSE AND expires_at > ?")
-    res, err := tx.Exec(consume, database.TokenHash(oldToken), userID, now)
-    if err != nil { return nil, err }
-    count, err := res.RowsAffected()
-    if err != nil { return nil, err }
-    if count != 1 { return nil, ErrRefreshTokenSpent }
-    // The current schema permits one refresh token per user. The consumed
-    // row is deleted in the same transaction; replay cannot win the CAS.
-    remove := database.Rebind("DELETE FROM refresh_tokens WHERE user_id = ?")
-    if _, err := tx.Exec(remove, userID); err != nil { return nil, err }
-    insert := database.Rebind("INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
-    if _, err := tx.Exec(insert, userID, database.TokenHash(raw), expiresAt); err != nil { return nil, err }
-    if err := tx.Commit(); err != nil { return nil, err }
-    return &types.RefreshToken{UserID: userID, Token: raw, ExpiresAt: expiresAt}, nil
+	raw, err := GenerateSecureToken(32)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	expiresAt := now.Add(duration)
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	consume := database.Rebind("UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = ? AND user_id = ? AND is_revoked = FALSE AND expires_at > ?")
+	res, err := tx.Exec(consume, database.TokenHash(oldToken), userID, now)
+	if err != nil {
+		return nil, err
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if count != 1 {
+		return nil, ErrRefreshTokenSpent
+	}
+	// The current schema permits one refresh token per user. The consumed
+	// row is deleted in the same transaction; replay cannot win the CAS.
+	remove := database.Rebind("DELETE FROM refresh_tokens WHERE user_id = ?")
+	if _, err := tx.Exec(remove, userID); err != nil {
+		return nil, err
+	}
+	insert := database.Rebind("INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
+	if _, err := tx.Exec(insert, userID, database.TokenHash(raw), expiresAt); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &types.RefreshToken{UserID: userID, Token: raw, ExpiresAt: expiresAt}, nil
 }
 
 // GetRefreshTokenByToken retrieves a refresh token by its token string.

@@ -6,7 +6,7 @@ import (
 	"auth-proxy/models"
 	"auth-proxy/utils"
 	"encoding/json"
-    "errors"
+	"errors"
 	"net/http"
 	"time"
 )
