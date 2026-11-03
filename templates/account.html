@@ -15,7 +15,7 @@
             <li><a href="{{.Paths.AccountPassword}}">Change Password</a></li>
         </ul>
         <div class="logout-link">
-            <a href="{{.Paths.Logout}}">Logout</a>
+            <form action="{{.Paths.Logout}}" method="post"><input type="hidden" name="xsrf_token" value="{{.LogoutXSRFToken}}"><button type="submit">Logout</button></form>
         </div>
     </div>
     <script src="{{.Paths.Assets}}/js/auth.js"></script>
