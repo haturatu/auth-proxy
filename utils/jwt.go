@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -32,17 +31,25 @@ func signHS256(key []byte, data string) []byte {
 	return h.Sum(nil)
 }
 
-// jwtAudience separates access-token trust across independent deployments.
-// Production requires TARGET_URL; an explicit audience is recommended if
-// multiple gateways share one upstream service.
-func jwtAudience() string {
-	if configured := strings.TrimSpace(os.Getenv("JWT_AUDIENCE")); configured != "" {
-		return configured
+// credentialTag binds each JWT to the server's current password hash.
+// The tag is keyed so it reveals nothing about the password hash.
+func credentialTag(key []byte, passwordHash string) string {
+	h := hmac.New(sha256.New, key)
+	_, _ = h.Write([]byte("auth-proxy/password-credential/v1:"))
+	_, _ = h.Write([]byte(passwordHash))
+	return base64Encode(h.Sum(nil)[:16])
+}
+
+// JWTMatchesCredentials rejects JWTs minted before a password change.
+func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
+	if payload == nil || user == nil || payload.CredentialTag == "" {
+		return false
 	}
-	if target, err := url.Parse(os.Getenv("TARGET_URL")); err == nil && target.Host != "" {
-		return "auth-proxy:" + target.Host
+	key, err := jwtSigningKey()
+	if err != nil {
+		return false
 	}
-	return "auth-proxy:local-test"
+	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, user.PasswordHash)))
 }
 
 func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
@@ -55,8 +62,7 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 		return "", err
 	}
 	payloadJSON, err := json.Marshal(types.JWTPayload{
-		Issuer: "auth-proxy", Audience: jwtAudience(), IssuedAt: time.Now().Unix(), NotBefore: time.Now().Unix(),
-		UserID: user.ID, Exp: time.Now().Add(duration).Unix(),
+		UserID: user.ID, Exp: time.Now().Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
 	})
 	if err != nil {
 		return "", err
@@ -107,12 +113,7 @@ func ValidateJWT(value string) (*types.JWTPayload, error) {
 	if err = json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("invalid JWT claims: %w", err)
 	}
-	now := time.Now().Unix()
-	if payload.Issuer != "auth-proxy" || payload.Audience != jwtAudience() ||
-		payload.IssuedAt <= 0 || payload.IssuedAt > now+60 ||
-		payload.NotBefore <= 0 || payload.NotBefore > now+60 ||
-		payload.UserID <= 0 || payload.Exp <= now {
-
+	if payload.UserID <= 0 || payload.Exp <= time.Now().Unix() || payload.CredentialTag == "" {
 		return nil, errors.New("token expired or invalid")
 	}
 	return &payload, nil
