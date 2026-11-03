@@ -21,7 +21,7 @@ func Validate() error {
 	if err != nil || target.Host == "" || (target.Scheme != "http" && target.Scheme != "https") || target.User != nil {
 		return fmt.Errorf("TARGET_URL must be an absolute http(s) URL without userinfo")
 	}
-	mode := os.Getenv("API_AUTH_MODE")
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("API_AUTH_MODE")))
 	switch mode {
 	case "", "bearer":
 	case "session", "either":
