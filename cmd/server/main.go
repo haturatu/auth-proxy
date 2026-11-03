@@ -48,8 +48,9 @@ func main() {
 	handlers.SetWorkerPool(pool)
 
 	rateLimiter := middleware.NewRateLimiter()
-	mainRouter := router.NewRouter(rateLimiter)
-	go router.StartBackgroundTasks(pool, rateLimiter)
+    loginLimiter := middleware.NewLoginRateLimiter()
+	mainRouter := router.NewRouter(rateLimiter, loginLimiter)
+	go router.StartBackgroundTasks(pool, rateLimiter, loginLimiter)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
