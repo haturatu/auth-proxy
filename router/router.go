@@ -140,22 +140,15 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 
 	// --- Final Handler ---
 	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The refresh endpoint is outside the configured /api/ prefix.
-		if r.URL.Path == "/auth/refresh" {
+		// Always dispatch the service-owned API routes before any proxy fallback.
+		// In particular, a custom admin API path must never bypass the
+		// AdminBearerAuth/AdminMiddleware chain when it is outside API_PATH.
+		if _, pattern := apiMux.Handler(r); pattern != "" {
 			apiMux.ServeHTTP(w, r)
 			return
 		}
-		// Handle API paths
+		// Handle proxied API paths. Service-owned routes were dispatched above.
 		if isAPIPath(r.URL.Path, config.Paths.APIPath) {
-			// Check if a specific handler exists in the API mux
-			_, pattern := apiMux.Handler(r)
-
-			// If a specific pattern is found, let the API mux handle it internally.
-			if pattern != "" {
-				apiMux.ServeHTTP(w, r)
-				return
-			}
-
 			// If no specific handler is found, it's a request to be proxied.
 			// Select explicit authentication mode for protected API paths.
 			// PROTECT_API=false would expose all upstream API traffic.
