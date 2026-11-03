@@ -30,6 +30,8 @@ type PathConfig struct {
 
 	// Security Policies
 	MaxLoginAttempts       int
+	AuthRateLimitMaxRequests int
+	AuthRateLimitWindowSeconds int
 	LockoutDurationMinutes int
 	RateLimitMaxRequests   int
 	RateLimitWindowSeconds int
