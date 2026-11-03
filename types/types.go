@@ -96,7 +96,6 @@ type RateLimiter struct {
 type WorkerPool struct {
 	Workers    int
 	TaskQueue  chan func()
-	ResultChan chan interface{}
 	Wg         sync.WaitGroup
 	Active     int64
 }
