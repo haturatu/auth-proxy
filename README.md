@@ -122,7 +122,7 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
   1.  A client sends a `POST` request with the user's username and password to the `/api/auth/token` endpoint.
   2.  The server validates the credentials.
   3.  On success, it generates and returns two tokens:
-      *   A short-lived **JWT Access Token** containing user claims (ID, role) and an expiration time. This token is signed to prevent tampering.
+      *   A short-lived **JWT Access Token** containing the user ID and an expiration time. This token is signed to prevent tampering.
       *   A long-lived **Refresh Token** that is stored in the database and can be used to obtain a new access token.
   
   ### Session Management

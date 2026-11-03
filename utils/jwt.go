@@ -41,7 +41,7 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 		return "", err
 	}
 	payloadJSON, err := json.Marshal(types.JWTPayload{
-		UserID: user.ID, Role: user.Role, Exp: time.Now().Add(duration).Unix(),
+		UserID: user.ID, Exp: time.Now().Add(duration).Unix(),
 	})
 	if err != nil {
 		return "", err
