@@ -44,7 +44,7 @@ The Go proxy traverses X-Forwarded-For from right to left while the current peer
 - Browser forms require a 15-minute signed XSRF token bound to an anonymous cookie or authenticated session. Do not remove the `anon_xsrf` cookie on login pages.
 - Go `CrossOriginProtection` rejects unsafe cross-origin browser requests to auth UI and admin API, not to arbitrary upstream/proxied paths.
 - A cookie-authenticated mutation to the admin API additionally requires the XSRF token issued by the admin page. The existing JavaScript uses `X-XSRF-Token` for this.
-- Generic proxied APIs using `BearerAuth` require a Bearer token for **every** method, including GET and HEAD. No cookie fallback is provided. The admin API remains the only API endpoint that accepts browser-session cookies and requires an XSRF token for unsafe methods.
+- Protected proxied API routes use `API_AUTH_MODE=bearer` by default. `session` explicitly allows browser-cookie authentication for HTML subresources, fetch, SSE and WebSocket; `either` accepts a Bearer token or a cookie, but never falls back after an invalid `Authorization` header. Admin APIs continue to use scoped XSRF validation.
 - `CSRF_TRUSTED_ORIGINS` is an optional **exact** comma-separated list of additional browser origins, such as `http://192.168.20.10:8080`, for deliberate cross-origin access. It is NOT a source-IP allowlist, CORS configuration, or an authentication bypass. Same-origin direct VLAN usage needs no entry.
 
 ## Secrets and passwords
@@ -65,4 +65,16 @@ FIPS 140-3, ML-KEM, and ML-DSA are intentionally not added.
 
 ## Breaking changes by design
 
-This hardening intentionally does **not** offer a compatibility mode for old JWT signing keys or cookie-authenticated proxied APIs. Redeploy clients with Bearer tokens and sign in again as needed. This does not change the separate browser admin session, the signed `xsrftoken` protection, or the explicit requirement for direct HTTP access from another VLAN.
+This hardening does **not** support legacy raw-secret JWT signing. Cookie authentication for proxied APIs is available only through the explicit `session` or `either` mode. Redeploy clients with Bearer tokens and sign in again as needed. This does not change the separate browser admin session, the signed `xsrftoken` protection, or the explicit requirement for direct HTTP access from another VLAN.
+
+## Browser-session API gateway (IAP-like)
+
+For the complete design, CSRF flow and backend assertion verification, see [Browser API authentication](docs/browser-session-auth.md). This uses a first-party session gateway with IAP/BFF-style identity forwarding; it is not itself an OAuth 2.0 BFF client.
+
+`PROTECT_API=true` is mandatory for protecting backend `/api/*`; `PROTECT_FRONTEND=true` alone does not protect the API. The default is `API_AUTH_MODE=bearer`. Choose `API_AUTH_MODE=session` for cookie-only browser apps, or `either` to support both browsers and machine clients. These are deliberate opt-ins, not silent cookie fallback.
+
+Cookie-authenticated APIs require same-origin Fetch Metadata / Origin checks, exact-Origin validation on WebSocket upgrades and signed XSRF tokens for unsafe methods. Same-origin browser JavaScript can retrieve a scoped token from `GET /api/auth/csrf` and send it as `X-XSRF-Token`. Native EventSource and browser WebSocket cannot add arbitrary Authorization headers; they can use cookies on same-origin connections. WebSocket requests without an Origin header are rejected in session modes. The API returns JSON 401 and `X-Login-URL` for non-navigation requests; native EventSource does **not** expose response headers to JavaScript, so its `onerror` handler must use a separate fetch/session-check if login detection is needed.
+
+Upstream identity request headers are always cleared and rebuilt from authenticated context. The edge never forwards `auth_token`, `anon_xsrf` or the client's Authorization credential. Optional `UPSTREAM_ASSERTION_ED25519_SEED` (a dedicated 32-byte base64 seed) signs a 60-second EdDSA `X-Auth-Request-JWT` with issuer `auth-proxy`, audience `UPSTREAM_ASSERTION_AUDIENCE` (default TARGET_URL host:port), subject, username, role, iat, exp and jti. Set `UPSTREAM_ASSERTION_AS_BEARER=true` only if a backend needs that signed assertion as Authorization. Verify the JWT using the public Ed25519 key in the backend; **never share the private seed**. If using unsigned identity headers alone, keep upstream accessible only from the proxy, not directly from the LAN.
+
+For direct cross-VLAN HTTP access such as `http://192.168.10.5:8080`, browsers can use same-origin cookies by setting `COOKIE_SECURE=false`, without trusted-proxy CIDRs. This is insecure against network interception; use HTTPS when possible. The default Docker configuration uses Secure cookies.

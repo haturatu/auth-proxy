@@ -130,7 +130,7 @@ Docker Compose で SQLite（標準）・PostgreSQL・MySQL・外部 DB を切り
 
 APIリクエストの場合、クライアントは`Authorization: Bearer <token>`ヘッダーにJWTアクセストークンを含める必要があります。サーバー上のミドルウェアが、トークンの署名と有効期限を検証します。このプロセスはステートレスであり、リクエストごとにデータベースを検索する必要がないため、非常に効率的です。アクセストークンが期限切れになった場合、クライアントはリフレッシュトークンを使用して、再認証することなく新しいアクセストークンを要求できます。
 
-**認証:** `PROTECT_API=true` の場合、プロキシ先APIのすべてのHTTPメソッドでBearer JWTを必須とします。Cookieへのフォールバックは廃止しました。CookieとXSRFトークンによる認証は管理画面のAPIでのみ使用できます。
+**認証:** `PROTECT_API=true` のとき、`API_AUTH_MODE=bearer` が標準（Bearer JWT必須）です。ブラウザのSSE／WebSocket／APIにCookie認証を使う場合は `session`、BearerとCookieの両方を許可する場合は `either` を明示指定します。Cookie認証では同一オリジン検証とCSRFトークン検証を行います。[ブラウザAPI認証ガイド](docs/browser-session-auth.md) を参照してください。
 
 ### トランスポート層セキュリティ（HTTPS）
 
