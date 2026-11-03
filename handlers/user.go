@@ -22,9 +22,9 @@ func AccountPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	logoutToken, _ := middleware.GenerateSessionXSRF(r, config.Paths.Logout)
 	data := map[string]interface{}{
-		"Paths":           config.Paths,
-		"User":            user,
-		"XSRFToken":       middleware.GetXSRFToken(r),
+		"Paths":     config.Paths,
+		"User":      user,
+		"XSRFToken": middleware.GetXSRFToken(r),
 		"LogoutXSRFToken": logoutToken,
 	}
 	if err := templates.ExecuteTemplate(w, "account.html", data); err != nil {
@@ -119,6 +119,12 @@ func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Expire this caller's browser session after the DB transaction revokes
+		// all stored browser/refresh credentials for the user.
+		http.SetCookie(w, &http.Cookie{
+			Name: "auth_token", Path: "/", MaxAge: -1, HttpOnly: true,
+			Secure: middleware.CookieSecure(r), SameSite: http.SameSiteLaxMode,
+		})
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{"message": "Password updated successfully."}); err != nil {
 			logging.AppLog.Error("Failed to encode json error response", "error", err)
