@@ -3,11 +3,18 @@ package utils
 import (
 	"auth-proxy/config"
 	"fmt"
+	"os"
 	"unicode"
 )
 
 // ValidatePassword checks a password against the policy defined in the PASSWORD_POLICY environment variable.
 func ValidatePassword(password string) (bool, string) {
+	// bcrypt accepts at most 72 bytes, not Unicode characters. Reject
+	// oversize inputs before attempting to hash, rather than surprising the
+	// caller with an internal bcrypt error.
+	if os.Getenv("PASSWORD_HASH_ALGORITHM") != "pbkdf2-sha256" && len([]byte(password)) > 72 {
+		return false, "bcrypt passwords must not exceed 72 bytes."
+	}
 	policy := config.Paths.PasswordPolicy
 
 	switch policy {
