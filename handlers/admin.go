@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -89,6 +90,24 @@ func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// parseAdminUserID rejects ambiguous/nested ID routes before a mutation.
+// It never extracts an ID by cutting arbitrary string offsets.
+func parseAdminUserID(path, prefix, suffix string) (int64, error) {
+	routePrefix := strings.TrimSuffix(prefix, "/") + "/"
+	if !strings.HasPrefix(path, routePrefix) || !strings.HasSuffix(path, suffix) {
+		return 0, fmt.Errorf("invalid admin API path")
+	}
+	idText := strings.TrimSuffix(strings.TrimPrefix(path, routePrefix), suffix)
+	if idText == "" || strings.Contains(idText, "/") {
+		return 0, fmt.Errorf("invalid admin user ID")
+	}
+	id, err := strconv.ParseInt(idText, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("invalid admin user ID")
+	}
+	return id, nil
+}
+
 // UpdateUserRoleHandler updates a user's role.
 func UpdateUserRoleHandler(w http.ResponseWriter, r *http.Request) {
 	ip := logging.GetClientIP(r)
@@ -101,7 +120,7 @@ func UpdateUserRoleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	adminUsername := adminUser.Username
 
-	id, err := strconv.ParseInt(r.URL.Path[len(config.Paths.AdminUsersAPI+"/"):len(r.URL.Path)-len("/role")], 10, 64)
+	id, err := parseAdminUserID(r.URL.Path, config.Paths.AdminUsersAPI, "/role")
 	if err != nil {
 		logging.AppLog.Warn("Invalid user ID in request", "path", r.URL.Path, "ip", ip)
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
@@ -146,7 +165,7 @@ func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	adminUsername := adminUser.Username
 
-	id, err := strconv.ParseInt(r.URL.Path[len(config.Paths.AdminUsersAPI+"/"):], 10, 64)
+	id, err := parseAdminUserID(r.URL.Path, config.Paths.AdminUsersAPI, "")
 	if err != nil {
 		logging.AppLog.Warn("Invalid user ID in request", "path", r.URL.Path, "ip", ip)
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
@@ -175,7 +194,7 @@ func SetUserActiveStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	adminUsername := adminUser.Username
 
-	id, err := strconv.ParseInt(r.URL.Path[len(config.Paths.AdminUsersAPI+"/"):len(r.URL.Path)-len("/status")], 10, 64)
+	id, err := parseAdminUserID(r.URL.Path, config.Paths.AdminUsersAPI, "/status")
 	if err != nil {
 		logging.AppLog.Warn("Invalid user ID in request", "path", r.URL.Path, "ip", ip)
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
