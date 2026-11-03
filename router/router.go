@@ -15,7 +15,7 @@ import (
 )
 
 // NewRouter creates and configures the main application router.
-func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
+func NewRouter(rateLimiter, loginLimiter *types.RateLimiter) http.Handler {
 	targetURL := os.Getenv("TARGET_URL")
 
 	// Browser CSRF defense is scoped to our own UI/admin endpoints, not to
@@ -61,7 +61,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 		accountPageHandler := handlers.NewPhpProxyHandler("account.php")
 		accountPasswordPageHandler := handlers.NewPhpProxyHandler("account_password.php")
 
-		loginHandler := methodSwitch(loginPageHandler, http.HandlerFunc(handlers.LoginHandler))
+		loginHandler := methodSwitch(loginPageHandler, middleware.RateLimitMiddleware(loginLimiter)(middleware.LimitAuthBody(http.HandlerFunc(handlers.LoginHandler))))
 		webMux.Handle(config.Paths.Login, loginHandler)
 
 		if config.Paths.RegisterEnabled {
@@ -77,7 +77,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 		webMux.Handle(config.Paths.Admin, middleware.SessionAuth(middleware.AdminMiddleware(http.HandlerFunc(handlers.AdminPageHandler))))
 	} else {
 		// Go template frontend routes
-		webMux.Handle(config.Paths.Login, middleware.LimitAuthBody(http.HandlerFunc(handlers.LoginHandler)))
+		webMux.Handle(config.Paths.Login, middleware.RateLimitMiddleware(loginLimiter)(middleware.LimitAuthBody(http.HandlerFunc(handlers.LoginHandler))))
 		if config.Paths.RegisterEnabled {
 			webMux.Handle(config.Paths.Register, middleware.RateLimitMiddleware(rateLimiter)(middleware.LimitAuthBody(http.HandlerFunc(handlers.RegisterHandler))))
 		}
@@ -88,7 +88,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	webMux.HandleFunc(config.Paths.Logout, handlers.LogoutHandler)
 
 	// --- API Routes (No XSRF) ---
-	apiMux.Handle("/api/auth/token", middleware.LimitAuthBody(http.HandlerFunc(handlers.TokenHandler)))
+	apiMux.Handle("/api/auth/token", middleware.RateLimitMiddleware(loginLimiter)(middleware.LimitAuthBody(http.HandlerFunc(handlers.TokenHandler))))
 	if config.Paths.APIAuthMode != "bearer" {
 		// A signed token for same-origin browser API mutations. No JS token
 		// is needed for GET EventSource streams or WebSocket handshakes.
@@ -179,7 +179,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 }
 
 // StartBackgroundTasks launches periodic jobs for cleanup.
-func StartBackgroundTasks(pool *types.WorkerPool, limiter *types.RateLimiter) {
+func StartBackgroundTasks(pool *types.WorkerPool, limiter, loginLimiter *types.RateLimiter) {
 	// Ticker for expired token cleanup (every hour)
 	tokenTicker := time.NewTicker(1 * time.Hour)
 	defer tokenTicker.Stop()
@@ -193,6 +193,7 @@ func StartBackgroundTasks(pool *types.WorkerPool, limiter *types.RateLimiter) {
 	// Run initial cleanup tasks at startup
 	submitTokenCleanup(pool)
 	submitRateLimiterCleanup(pool, limiter)
+        submitRateLimiterCleanup(pool, loginLimiter)
 
 	// Run tasks on their respective tickers
 	for {
@@ -201,6 +202,7 @@ func StartBackgroundTasks(pool *types.WorkerPool, limiter *types.RateLimiter) {
 			submitTokenCleanup(pool)
 		case <-rateLimiterTicker.C:
 			submitRateLimiterCleanup(pool, limiter)
+        submitRateLimiterCleanup(pool, loginLimiter)
 		}
 	}
 }
