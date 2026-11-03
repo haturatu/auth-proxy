@@ -14,6 +14,13 @@ import (
 	"time"
 )
 
+// isAPIPath checks the path prefix at a URL segment boundary, including the
+// prefix root itself (for example /api and /api/...).
+func isAPIPath(path, prefix string) bool {
+	root := strings.TrimSuffix(prefix, "/")
+	return path == root || strings.HasPrefix(path, root+"/")
+}
+
 // NewRouter creates and configures the main application router.
 func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	targetURL := os.Getenv("TARGET_URL")
@@ -139,7 +146,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 			return
 		}
 		// Handle API paths
-		if strings.HasPrefix(r.URL.Path, config.Paths.APIPath) {
+		if isAPIPath(r.URL.Path, config.Paths.APIPath) {
 			// Check if a specific handler exists in the API mux
 			_, pattern := apiMux.Handler(r)
 
