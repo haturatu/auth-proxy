@@ -23,7 +23,7 @@ func loadTemplates() *template.Template {
 		pattern = "../templates/*.html"
 	}
 	return template.Must(template.ParseGlob(pattern))
-
+}
 
 // authenticateUser handles the core logic for authenticating a user, including brute-force protection.
 // It returns the authenticated user or an error if authentication fails.
