@@ -10,6 +10,7 @@ import (
 	"auth-proxy/worker"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -37,8 +38,13 @@ func main() {
 
 	// --- Secret Key Validation ---
 	sessionSecret := os.Getenv("SESSION_SECRET")
-	if sessionSecret == "" {
-		logging.AppLog.Warn("SESSION_SECRET environment variable not set. Using default key. THIS IS NOT SAFE FOR PRODUCTION.")
+	if len(sessionSecret) < 32 {
+		logging.AppLog.Error("SESSION_SECRET must contain at least 32 bytes of random data")
+		os.Exit(1)
+	}
+	if err := logging.ConfigureTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS")); err != nil {
+		logging.AppLog.Error("Invalid TRUSTED_PROXY_CIDRS", "error", err)
+		os.Exit(1)
 	}
 	xsrfSecret := os.Getenv("XSRF_SECRET_KEY")
 	if xsrfSecret == "" {
@@ -70,7 +76,15 @@ func main() {
 	// --- Start Server ---
 	logging.AppLog.Info("Server starting on " + listenAddr)
 
-	if err := http.ListenAndServe(listenAddr, mainRouter); err != nil {
+	srv := &http.Server{
+		Addr:                listenAddr,
+		Handler:             mainRouter,
+		ReadHeaderTimeout:   5 * time.Second,
+		IdleTimeout:         60 * time.Second,
+		MaxHeaderBytes:      32 << 10,
+		MaxHeaderValueCount: 128,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		logging.AppLog.Error("Server failed to start", "error", err)
 		os.Exit(1)
 	}

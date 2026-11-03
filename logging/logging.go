@@ -1,67 +1,95 @@
 package logging
 
 import (
-	"log/slog"
-	"net"
-	"net/http"
-	"os"
-	"strings"
+    "fmt"
+    "log/slog"
+    "net"
+    "net/http"
+    "net/netip"
+    "os"
+    "strings"
+    "sync"
 )
 
 var (
-	AppLog      *slog.Logger
-	SecurityLog *slog.Logger
+    AppLog *slog.Logger
+    SecurityLog *slog.Logger
+    trustedProxies []netip.Prefix
+    proxyMu sync.RWMutex
 )
 
-// InitLoggers initializes the application and security loggers.
 func InitLoggers() {
-	// For now, both loggers write to stdout.
-	// This could be configured to write to different files (e.g., app.log, security.log)
-	appWriter := os.Stdout
-	securityWriter := os.Stdout
-
-	var logLevel slog.Level
-	switch strings.ToUpper(os.Getenv("LOG_LEVEL")) {
-	case "DEBUG":
-		logLevel = slog.LevelDebug
-	case "INFO":
-		logLevel = slog.LevelInfo
-	case "WARN":
-		logLevel = slog.LevelWarn
-	case "ERROR":
-		logLevel = slog.LevelError
-	default:
-		logLevel = slog.LevelInfo // Default to INFO
-	}
-
-	AppLog = slog.New(slog.NewTextHandler(appWriter, &slog.HandlerOptions{
-		Level:     logLevel,
-		AddSource: false, // Include source file and line number for app logs
-	}))
-
-	SecurityLog = slog.New(slog.NewTextHandler(securityWriter, &slog.HandlerOptions{
-		Level: logLevel,
-		// The default TextHandler format is `time=... level=... msg=... key=value`.
-		// This is structured and easily parsable, so we'll stick with it.
-	}))
+    level := slog.LevelInfo
+    switch strings.ToUpper(os.Getenv("LOG_LEVEL")) {
+    case "DEBUG": level = slog.LevelDebug
+    case "WARN": level = slog.LevelWarn
+    case "ERROR": level = slog.LevelError
+    }
+    AppLog = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+    SecurityLog = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 }
 
-// GetClientIP extracts the client IP address from the request.
-// It prioritizes the X-Forwarded-For header to work behind a reverse proxy.
-func GetClientIP(r *http.Request) string {
-	// Check the X-Forwarded-For header first.
-	forwardedFor := r.Header.Get("X-Forwarded-For")
-	if forwardedFor != "" {
-		// The header can contain a comma-separated list of IPs. The client IP is the first one.
-		ips := strings.Split(forwardedFor, ",")
-		return strings.TrimSpace(ips[0])
-	}
+// ConfigureTrustedProxies accepts only the addresses of immediate, controlled reverse proxies.
+// An empty value (the default) never trusts X-Forwarded-* from a direct VLAN client.
+func ConfigureTrustedProxies(raw string) error {
+    prefixes := []netip.Prefix{}
+    for _, entry := range strings.Split(raw, ",") {
+        entry = strings.TrimSpace(entry)
+        if entry == "" { continue }
+        prefix, err := netip.ParsePrefix(entry)
+        if err != nil {
+            ip, ipErr := netip.ParseAddr(entry)
+            if ipErr != nil { return fmt.Errorf("invalid proxy address %q: %w", entry, err) }
+            prefix = netip.PrefixFrom(ip, ip.BitLen())
+        }
+        prefixes = append(prefixes, prefix.Masked())
+    }
+    proxyMu.Lock()
+    trustedProxies = prefixes
+    proxyMu.Unlock()
+    return nil
+}
 
-	// If the header is not present, fall back to RemoteAddr.
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		// If parsing fails (e.g., no port), return the raw RemoteAddr.
-		return r.RemoteAddr
-	}
-	return ip
+func isTrusted(ip netip.Addr) bool {
+    proxyMu.RLock()
+    defer proxyMu.RUnlock()
+    for _, prefix := range trustedProxies {
+        if prefix.Contains(ip.Unmap()) { return true }
+    }
+    return false
+}
+
+func peerIP(r *http.Request) (netip.Addr, bool) {
+    host, _, err := net.SplitHostPort(r.RemoteAddr)
+    if err != nil { host = r.RemoteAddr }
+    ip, err := netip.ParseAddr(strings.Trim(host, "[]"))
+    return ip.Unmap(), err == nil
+}
+
+// GetClientIP walks a trusted forwarding chain from right to left.
+// Direct clients cannot spoof the address by sending X-Forwarded-For.
+func GetClientIP(r *http.Request) string {
+    peer, ok := peerIP(r)
+    if !ok { return r.RemoteAddr }
+    current := peer
+    if isTrusted(peer) {
+        forwarded := r.Header.Values("X-Forwarded-For")
+        chain := strings.Split(strings.Join(forwarded, ","), ",")
+        for i := len(chain) - 1; i >= 0 && isTrusted(current); i-- {
+            next, err := netip.ParseAddr(strings.TrimSpace(chain[i]))
+            if err != nil { break }
+            current = next.Unmap()
+        }
+    }
+    return current.String()
+}
+
+// GetClientScheme trusts X-Forwarded-Proto only from configured proxies.
+func GetClientScheme(r *http.Request) string {
+    if r.TLS != nil { return "https" }
+    if peer, ok := peerIP(r); ok && isTrusted(peer) &&
+        strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+        return "https"
+    }
+    return "http"
 }

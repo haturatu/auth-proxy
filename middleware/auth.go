@@ -39,13 +39,16 @@ func SessionAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		if user == nil {
+		if user == nil || !user.IsActive {
 			// Clear the invalid cookie
 			http.SetCookie(w, &http.Cookie{
-				Name:   "auth_token",
-				Value:  "",
-				Path:   "/",
-				MaxAge: -1,
+				Name:     "auth_token",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+				Secure:   CookieSecure(r),
+				SameSite: http.SameSiteLaxMode,
 			})
 			logging.SecurityLog.Warn("ACCESS DENIED", "reason", "invalid or expired session token", "path", r.URL.Path, "ip", ip)
 			http.Redirect(w, r, config.Paths.Login, http.StatusFound)
@@ -63,7 +66,15 @@ func SessionAuth(next http.Handler) http.Handler {
 // BearerAuth is a middleware that checks for a valid JWT Bearer token.
 // If the token is valid, it adds the user info to the context and proceeds.
 // If not, it returns a 401 Unauthorized error. Suitable for API endpoints.
-func BearerAuth(next http.Handler) http.Handler {
+func BearerAuth(next http.Handler) http.Handler { return bearerAuth(next, "") }
+
+// AdminBearerAuth permits cookie-authenticated admin mutations only with a valid
+// token issued for the admin dashboard. General proxied API mutations require Bearer.
+func AdminBearerAuth(next http.Handler) http.Handler {
+	return bearerAuth(next, config.Paths.Admin)
+}
+
+func bearerAuth(next http.Handler, cookieCSRFScope string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := logging.GetClientIP(r)
 		authHeader := r.Header.Get("Authorization")
@@ -110,6 +121,12 @@ func BearerAuth(next http.Handler) http.Handler {
 		}
 
 		// --- Fallback to Cookie-based session for browser clients ---
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			if cookieCSRFScope == "" || !ValidateSessionXSRF(r, cookieCSRFScope) {
+				http.Error(w, "CSRF token required for cookie-authenticated writes", http.StatusForbidden)
+				return
+			}
+		}
 		cookie, err := r.Cookie("auth_token")
 		if err != nil {
 			// No Authorization header AND no cookie, deny access
@@ -120,7 +137,7 @@ func BearerAuth(next http.Handler) http.Handler {
 
 		tokenStr := cookie.Value
 		user, err := models.GetUserByToken(tokenStr)
-		if err != nil || user == nil {
+		if err != nil || user == nil || !user.IsActive {
 			logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "invalid session cookie", "path", r.URL.Path, "ip", ip)
 			http.Error(w, "Unauthorized: Invalid session", http.StatusUnauthorized)
 			return

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"auth-proxy/logging"
+	"auth-proxy/types"
 	"auth-proxy/worker"
 	"net/http"
 	"net/http/httputil"
@@ -15,20 +16,27 @@ func NewProxy(targetURL string) http.Handler {
 		panic("Invalid target URL: " + err.Error())
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			pr.SetXForwarded()
+			pr.Out.Header.Set("X-Forwarded-For", logging.GetClientIP(pr.In))
+			pr.Out.Header.Set("X-Forwarded-Proto", logging.GetClientScheme(pr.In))
 
-	// The default director is mostly fine, but we want to log and ensure the Host header is correct.
-	director := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		director(req)          // Run the default director
-		req.Host = target.Host // Set the Host header to the target's host
+			// Never trust identity headers supplied by the client.
+			pr.Out.Header.Del("X-Username")
+			pr.Out.Header.Del("X-User-Role")
+			if user, ok := pr.In.Context().Value(types.SessionDataContextKey).(*types.User); ok && user != nil {
+				pr.Out.Header.Set("X-Username", user.Username)
+				pr.Out.Header.Set("X-User-Role", user.Role)
+			}
 
-		// Asynchronously log the proxying action to avoid blocking the request.
-		urlStr := req.URL.String()
-		ip := logging.GetClientIP(req)
-		worker.Submit(workerPool, func() {
-			logging.AppLog.Info("Proxying request", "url", urlStr, "ip", ip)
-		})
+			urlStr := pr.Out.URL.String()
+			ip := logging.GetClientIP(pr.In)
+			worker.Submit(workerPool, func() {
+				logging.AppLog.Info("Proxying request", "url", urlStr, "ip", ip)
+			})
+		},
 	}
 
 	// Custom error handler for logging

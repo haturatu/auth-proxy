@@ -103,7 +103,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("auth_token")
 	if err == nil {
 		user, _ := models.GetUserByToken(cookie.Value)
-		if user != nil {
+		if user != nil && user.IsActive {
 			http.Redirect(w, r, config.Paths.Account, http.StatusFound)
 			return
 		}
@@ -161,7 +161,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Expires:  token.ExpiresAt,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   r.TLS != nil, // Use Secure flag if on HTTPS
+			Secure:   middleware.CookieSecure(r),
 			SameSite: http.SameSiteLaxMode,
 		})
 
