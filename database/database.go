@@ -3,7 +3,6 @@ package database
 import (
 	"auth-proxy/logging"
 	"database/sql"
-	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -49,22 +48,10 @@ func initFromURL(databaseURL string) {
 	case "mysql":
 		dbType = "mysql"
 
-		// The mysql driver requires parseTime=true to scan DATE/DATETIME into time.Time
-		q := u.Query()
-		if q.Get("parseTime") == "" {
-			q.Set("parseTime", "true")
-		}
-		u.RawQuery = q.Encode()
-
-		// The mysql driver DSN format is user:password@tcp(host:port)/dbname
-		var dsn string
-		if u.User != nil {
-			dsn = fmt.Sprintf("%s@tcp(%s)%s", u.User.String(), u.Host, u.Path)
-		} else {
-			dsn = fmt.Sprintf("tcp(%s)%s", u.Host, u.Path)
-		}
-		if u.RawQuery != "" {
-			dsn = fmt.Sprintf("%s?%s", dsn, u.RawQuery)
+		dsn, err := mysqlDSN(databaseURL)
+		if err != nil {
+			logging.AppLog.Error("Invalid MySQL DATABASE_URL", "error", err)
+			os.Exit(1)
 		}
 		initMySQL(dsn)
 	default:
@@ -81,12 +68,13 @@ func initSQLite() {
 	}
 
 	var err error
-	DB, err = sql.Open("sqlite3", databasePath)
+	DB, err = sql.Open("sqlite3", "file:"+databasePath+"?_busy_timeout=5000&_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		logging.AppLog.Error("Failed to open sqlite database", "error", err)
 		os.Exit(1)
 	}
-	if err = DB.Ping(); err != nil {
+	DB.SetMaxOpenConns(1)
+	if err = retryPing(DB); err != nil {
 		logging.AppLog.Error("Failed to connect to sqlite database", "error", err)
 		os.Exit(1)
 	}
@@ -101,7 +89,7 @@ func initPostgreSQL(dataSourceName string) {
 		logging.AppLog.Error("Failed to open postgres database", "error", err)
 		os.Exit(1)
 	}
-	if err = DB.Ping(); err != nil {
+	if err = retryPing(DB); err != nil {
 		logging.AppLog.Error("Failed to connect to postgres database", "error", err)
 		os.Exit(1)
 	}
@@ -116,7 +104,7 @@ func initMySQL(dataSourceName string) {
 		logging.AppLog.Error("Failed to open mysql database", "error", err)
 		os.Exit(1)
 	}
-	if err = DB.Ping(); err != nil {
+	if err = retryPing(DB); err != nil {
 		logging.AppLog.Error("Failed to connect to mysql database", "error", err)
 		os.Exit(1)
 	}
