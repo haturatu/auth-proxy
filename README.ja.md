@@ -183,7 +183,7 @@ TARGET_URL=http://localhost:8081
 
 # セッションクッキーとJWTを保護するための長くてランダムな文字列
 # 本番環境では、openssl rand -base64 45 を使って新しいキーを生成してください
-SESSION_SECRET=my-super-secret-key
+SESSION_SECRET= # Generate with: openssl rand -base64 48
 
 # (必須) XSRF保護のための32バイトのランダムなキー。
 # 生成コマンド: openssl rand -base64 32
@@ -543,3 +543,5 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 | `AUTH_ASSETS_PATH` | 内部静的アセット（CSS, JS）を提供するためのURLパス。 | `/assets` |
 | `ENV` | ランタイム環境。セキュアなクッキーを有効にするには`production`に設定します。 | - |
 | `XSRF_SECRET_KEY` | **(必須)** XSRF保護のための32バイトのランダムなキー。`openssl rand -base64 32` で生成します。 | - |
+
+> Never copy a fixed `SESSION_SECRET` from documentation into a live deployment. Generate a unique secret with `openssl rand -base64 48` and set it in `.env` or your secrets manager. Startup refuses secrets shorter than 32 bytes.
