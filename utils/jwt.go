@@ -31,6 +31,27 @@ func signHS256(key []byte, data string) []byte {
 	return h.Sum(nil)
 }
 
+// credentialTag binds each JWT to the server's current password hash.
+// The tag is keyed so it reveals nothing about the password hash.
+func credentialTag(key []byte, passwordHash string) string {
+	h := hmac.New(sha256.New, key)
+	_, _ = h.Write([]byte("auth-proxy/password-credential/v1:"))
+	_, _ = h.Write([]byte(passwordHash))
+	return base64Encode(h.Sum(nil)[:16])
+}
+
+// JWTMatchesCredentials rejects JWTs minted before a password change.
+func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
+	if payload == nil || user == nil || payload.CredentialTag == "" {
+		return false
+	}
+	key, err := jwtSigningKey()
+	if err != nil {
+		return false
+	}
+	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, user.PasswordHash)))
+}
+
 func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 	key, err := jwtSigningKey()
 	if err != nil {
@@ -41,7 +62,7 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 		return "", err
 	}
 	payloadJSON, err := json.Marshal(types.JWTPayload{
-		UserID: user.ID, Exp: time.Now().Add(duration).Unix(),
+		UserID: user.ID, Exp: time.Now().Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
 	})
 	if err != nil {
 		return "", err
@@ -92,7 +113,7 @@ func ValidateJWT(value string) (*types.JWTPayload, error) {
 	if err = json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("invalid JWT claims: %w", err)
 	}
-	if payload.UserID <= 0 || payload.Exp <= time.Now().Unix() {
+	if payload.UserID <= 0 || payload.Exp <= time.Now().Unix() || payload.CredentialTag == "" {
 		return nil, errors.New("token expired or invalid")
 	}
 	return &payload, nil
