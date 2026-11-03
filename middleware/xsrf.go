@@ -74,6 +74,16 @@ func ValidateSessionXSRF(r *http.Request, scope string) bool {
 	return verifyXSRF(r, scope, secret)
 }
 
+// GenerateSessionXSRF uses the same signed token format as the admin UI.
+// Cookie authentication (not JWT/Bearer) must have been verified by the caller.
+func GenerateSessionXSRF(r *http.Request, scope string) (string, bool) {
+	secret, ok := xsrfSecret()
+	if !ok { return "", false }
+	cookie, err := r.Cookie("auth_token")
+	if err != nil || cookie.Value == "" { return "", false }
+	return xsrftoken.Generate(string(secret), "auth:" + cookie.Value, scope), true
+}
+
 func XSRF(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		secret, ok := xsrfSecret()
