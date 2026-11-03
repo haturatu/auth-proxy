@@ -180,7 +180,6 @@ func createTables() {
 		}
 	}
 
-
 	// Now, create the auth_tokens table
 	var createTokenTableSQL string
 	switch dbType {
