@@ -35,7 +35,7 @@ func TestSecurityChaosProtectedAPIPaths(t *testing.T) {
 		Account: "/account", AccountPassword: "/account/password",
 		Admin: "/admin", Assets: "/assets",
 	}
-	h := NewRouter(middleware.NewRateLimiter())
+	h := NewRouter(middleware.NewRateLimiter(), middleware.NewLoginRateLimiter())
 	for _, path := range []string{
 		"/api", "/api/", "/api/secret", "/api/v1/users",
 		"/api/admin/users", "/api/auth/token/", "/api//private",
@@ -64,7 +64,9 @@ func FuzzAPIPrefixBoundary(f *testing.F) {
 		f.Add(path)
 	}
 	f.Fuzz(func(t *testing.T, path string) {
-		if len(path) > 512 { return }
+		if len(path) > 512 {
+			return
+		}
 		got := isAPIPath(path, "/api/")
 		want := path == "/api" || strings.HasPrefix(path, "/api/")
 		if got != want {
