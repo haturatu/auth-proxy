@@ -86,6 +86,7 @@ type JWTPayload struct {
 	NotBefore int64  `json:"nbf"`
 	UserID    int64  `json:"user_id"`
 	Exp       int64  `json:"exp"`
+	CredentialTag string `json:"cv"`
 }
 
 // RateLimiter represents a user-specific rate limiter.
