@@ -57,6 +57,15 @@ UPSTREAM_ASSERTION_AUDIENCE=backend.internal:8081
 UPSTREAM_ASSERTION_AS_BEARER=false
 ```
 
+Generate a dedicated private seed and export the corresponding **public** verification key:
+
+```sh
+export UPSTREAM_ASSERTION_ED25519_SEED="$(openssl rand -base64 32)"
+go run ./cmd/assertion-public-key
+```
+
+Provision only the resulting base64-encoded **public key** to each upstream service, ideally using an authenticated deployment channel. Do not expose the seed in CI logs or container image layers.
+
 The seed is a **dedicated private signing key**, not `SESSION_SECRET`. The resulting `X-Auth-Request-JWT` uses EdDSA (Ed25519), with `iss=auth-proxy`, `aud` (target host:port by default), `sub` (user ID), `preferred_username`, `role`, `iat`, `exp` (60 seconds), and random `jti`. The upstream **must verify signature and audience, issuer, and expiry** using its provisioned public key. Setting `UPSTREAM_ASSERTION_AS_BEARER=true` additionally puts the signed assertion into `Authorization: Bearer` for backends requiring it. It never forwards the caller's raw JWT or edge session cookie.
 
 Without a verifying backend, unsigned identity headers are safe only when the backend is network-isolated from clients (loopback, internal Docker network, firewall). Do not publish such a backend directly on another VLAN. Signed claims do not automatically revalidate already-established WebSocket sessions after revocation.

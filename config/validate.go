@@ -30,6 +30,10 @@ func Validate() error {
 	default:
 		return fmt.Errorf("API_AUTH_MODE must be bearer, session, or either")
 	}
+	if os.Getenv("UPSTREAM_ASSERTION_AS_BEARER") == "true" &&
+		os.Getenv("UPSTREAM_ASSERTION_ED25519_SEED") == "" {
+		return fmt.Errorf("UPSTREAM_ASSERTION_AS_BEARER requires UPSTREAM_ASSERTION_ED25519_SEED")
+	}
 	if seed := os.Getenv("UPSTREAM_ASSERTION_ED25519_SEED"); seed != "" {
 		key, err := base64.StdEncoding.DecodeString(seed)
 		if err != nil || len(key) != 32 {

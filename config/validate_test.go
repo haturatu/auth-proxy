@@ -45,3 +45,19 @@ func TestAPIAuthModeValidation(t *testing.T) {
 		t.Fatal("invalid assertion seed accepted")
 	}
 }
+
+func TestUpstreamAssertionBearerRequiresSigningKey(t *testing.T) {
+	t.Setenv("SESSION_SECRET", strings.Repeat("s", 32))
+	t.Setenv("XSRF_SECRET_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))
+	t.Setenv("TARGET_URL", "http://backend:8081")
+	t.Setenv("API_AUTH_MODE", "bearer")
+	t.Setenv("UPSTREAM_ASSERTION_AS_BEARER", "true")
+	t.Setenv("UPSTREAM_ASSERTION_ED25519_SEED", "")
+	if err := Validate(); err == nil {
+		t.Fatal("Bearer injection without a signing key must be rejected")
+	}
+	t.Setenv("UPSTREAM_ASSERTION_ED25519_SEED", base64.StdEncoding.EncodeToString(make([]byte, 32)))
+	if err := Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
