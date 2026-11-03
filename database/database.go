@@ -130,7 +130,7 @@ func createTables() {
 	case "postgres":
 		createTableSQL = `CREATE TABLE IF NOT EXISTS users (
 			id SERIAL PRIMARY KEY,
-			username VARCHAR(255) NOT NULL UNIQUE,
+			username VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,
 			password_hash VARCHAR(255) NOT NULL,
 			role VARCHAR(50) NOT NULL,
 			is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -158,6 +158,28 @@ func createTables() {
 		os.Exit(1)
 	}
 	logging.AppLog.Info("Users table verified successfully")
+	// MySQL/MariaDB frequently default to a case-insensitive collation.
+	// Match the case-sensitive user lookup semantics of SQLite/PostgreSQL,
+	// including on existing installations, without rewriting account names.
+	if dbType == "mysql" {
+		var collation string
+		err := DB.QueryRow(`SELECT COLLATION_NAME FROM information_schema.COLUMNS
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+			  AND COLUMN_NAME = 'username'`).Scan(&collation)
+		if err != nil {
+			logging.AppLog.Error("Failed to inspect username collation", "error", err)
+			os.Exit(1)
+		}
+		if !strings.EqualFold(collation, "utf8mb4_bin") {
+			_, err := DB.Exec(`ALTER TABLE users
+				MODIFY username VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL`)
+			if err != nil {
+				logging.AppLog.Error("Failed to migrate username collation", "error", err)
+				os.Exit(1)
+			}
+		}
+	}
+
 
 	// Now, create the auth_tokens table
 	var createTokenTableSQL string
