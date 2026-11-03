@@ -6,7 +6,10 @@ import (
 
 func TestAllowedRequestHost(t *testing.T) {
 	t.Setenv("ALLOWED_HOSTS", "auth.example.com,localhost:8080")
-	for _, tc := range []struct { host string; allow bool }{
+	for _, tc := range []struct {
+		host  string
+		allow bool
+	}{
 		{"auth.example.com", true},
 		{"AUTH.EXAMPLE.COM", true},
 		{"localhost:8080", true},
