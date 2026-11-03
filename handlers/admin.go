@@ -36,9 +36,9 @@ func AdminPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	logoutToken, _ := middleware.GenerateSessionXSRF(r, config.Paths.Logout)
 	data := map[string]interface{}{
-		"Paths":     config.Paths,
-		"Users":     users,
-		"XSRFToken": middleware.GetXSRFToken(r),
+		"Paths":           config.Paths,
+		"Users":           users,
+		"XSRFToken":       middleware.GetXSRFToken(r),
 		"LogoutXSRFToken": logoutToken,
 	}
 	if err := templates.ExecuteTemplate(w, "admin.html", data); err != nil {
