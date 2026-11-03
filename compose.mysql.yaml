@@ -1,0 +1,27 @@
+services:
+  auth-proxy:
+    environment:
+      # Set DB_PASSWORD to a URI-safe value, for example openssl rand -hex 24.
+      DATABASE_URL: "mysql://${DB_USER:-auth}:${DB_PASSWORD:?Set DB_PASSWORD}@mysql:3306/${DB_NAME:-auth}?charset=utf8mb4&parseTime=true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-auth}
+      MYSQL_USER: ${DB_USER:-auth}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u $$$MYSQL_USER -p$$$MYSQL_PASSWORD $$$MYSQL_DATABASE -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  mysql_data:

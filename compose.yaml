@@ -1,0 +1,25 @@
+services:
+  auth-proxy:
+    build: .
+    restart: unless-stopped
+    environment:
+      LISTEN_PORT: "8080"
+      TARGET_URL: ${TARGET_URL:?Set TARGET_URL in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      XSRF_SECRET_KEY: ${XSRF_SECRET_KEY:?Set XSRF_SECRET_KEY in .env}
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_PATH: /data/auth.db
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      FRONTEND_TYPE: ${FRONTEND_TYPE:-js}
+      PROTECT_FRONTEND: ${PROTECT_FRONTEND:-true}
+      PROTECT_API: ${PROTECT_API:-true}
+      REGISTER: ${REGISTER:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${AUTH_PORT:-8080}:8080"
+    volumes:
+      - sqlite_data:/data
+
+volumes:
+  sqlite_data:
