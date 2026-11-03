@@ -3,8 +3,8 @@ package handlers
 import (
 	"auth-proxy/config"
 	"auth-proxy/logging"
-	"auth-proxy/models"
 	"auth-proxy/middleware"
+	"auth-proxy/models"
 	"net/http"
 	"time"
 )

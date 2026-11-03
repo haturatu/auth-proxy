@@ -23,7 +23,9 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 	crossOrigin := http.NewCrossOriginProtection()
 	for _, entry := range strings.Split(os.Getenv("CSRF_TRUSTED_ORIGINS"), ",") {
 		origin := strings.TrimSpace(entry)
-		if origin == "" { continue }
+		if origin == "" {
+			continue
+		}
 		if err := crossOrigin.AddTrustedOrigin(origin); err != nil {
 			panic("invalid CSRF_TRUSTED_ORIGINS: " + err.Error())
 		}
@@ -77,7 +79,7 @@ func NewRouter(rateLimiter *types.RateLimiter) http.Handler {
 		// Go template frontend routes
 		webMux.Handle(config.Paths.Login, middleware.LimitAuthBody(http.HandlerFunc(handlers.LoginHandler)))
 		if config.Paths.RegisterEnabled {
-			webMux.Handle(config.Paths.Register, middleware.RateLimitMiddleware(rateLimiter)(http.HandlerFunc(handlers.RegisterHandler)))
+			webMux.Handle(config.Paths.Register, middleware.RateLimitMiddleware(rateLimiter)(middleware.LimitAuthBody(http.HandlerFunc(handlers.RegisterHandler))))
 		}
 		webMux.Handle(config.Paths.Account, middleware.SessionAuth(http.HandlerFunc(handlers.AccountPageHandler)))
 		webMux.Handle(config.Paths.Admin, middleware.SessionAuth(middleware.AdminMiddleware(http.HandlerFunc(handlers.AdminPageHandler))))

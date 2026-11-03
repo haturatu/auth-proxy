@@ -71,18 +71,6 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: '**/go.sum'
 
-      # TEMPORARY: emit gofmt output so it can be committed back to this PR.
-      - name: Export formatted Go files
-        run: |
-          gofmt -w .
-          python3 - <<'PY'
-          import json, subprocess
-          files = subprocess.check_output(['git','diff','--name-only','--','*.go'], text=True).splitlines()
-          for path in files:
-              with open(path, encoding='utf-8') as file:
-                  print('FMT_FILE=' + json.dumps({'path':path,'content':file.read()}, separators=(',',':')))
-          PY
-
       - name: Check formatting
         run: |
           gofmt_output=$(gofmt -l .)
@@ -97,3 +85,17 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    name: Test (race + vet)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: '**/go.sum'
+      - run: go test -race -timeout=120s ./...
+      - run: go vet ./...
