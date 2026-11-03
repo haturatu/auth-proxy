@@ -3,6 +3,8 @@ package database
 import (
 	"auth-proxy/logging"
 	"database/sql"
+    "crypto/sha256"
+    "encoding/hex"
 	"net/url"
 	"os"
 	"strconv"
@@ -229,7 +231,46 @@ func createTables() {
 		os.Exit(1)
 	}
 	logging.AppLog.Info("Refresh_tokens table verified successfully")
+	for _, table := range []string{"auth_tokens", "refresh_tokens"} {
+		if err := migrateTokenHashes(table); err != nil {
+			logging.AppLog.Error("Failed to migrate bearer token hashes", "table", table, "error", err)
+			os.Exit(1)
+		}
+	}
 
+
+}
+
+// TokenHash derives the identifier stored for a bearer credential.
+// The raw token must only be returned to the client, never persisted.
+func TokenHash(raw string) string {
+    sum := sha256.Sum256([]byte(raw))
+    return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// migrateTokenHashes converts previously stored plaintext tokens in place.
+// Existing clients keep their tokens and need not sign in again after upgrade.
+func migrateTokenHashes(table string) error {
+    rows, err := DB.Query("SELECT id, token FROM " + table)
+    if err != nil { return err }
+    type row struct { id int64; token string }
+    var legacy []row
+    for rows.Next() {
+        var x row
+        if err := rows.Scan(&x.id, &x.token); err != nil { _ = rows.Close(); return err }
+        if !strings.HasPrefix(x.token, "sha256:") { legacy = append(legacy, x) }
+    }
+    if err := rows.Err(); err != nil { _ = rows.Close(); return err }
+    if err := rows.Close(); err != nil { return err }
+    if len(legacy) == 0 { return nil }
+    tx, err := DB.Begin()
+    if err != nil { return err }
+    defer tx.Rollback() //nolint:errcheck
+    query := Rebind("UPDATE " + table + " SET token = ? WHERE id = ?")
+    for _, x := range legacy {
+        if _, err := tx.Exec(query, TokenHash(x.token), x.id); err != nil { return err }
+    }
+    return tx.Commit()
 }
 
 // Rebind converts a query with '_?_' placeholders to the database-specific format.
