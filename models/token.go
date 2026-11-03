@@ -85,12 +85,28 @@ func DeleteAuthToken(tokenString string) error {
 
 // DeleteExpiredTokens cleans up expired tokens from the database.
 func DeleteExpiredTokens() (int64, error) {
-	query := database.Rebind("DELETE FROM auth_tokens WHERE expires_at < ?")
-	res, err := database.DB.Exec(query, time.Now())
+	tx, err := database.DB.Begin()
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	defer tx.Rollback() //nolint:errcheck
+	var deleted int64
+	for _, table := range []string{"auth_tokens", "refresh_tokens", "consumed_refresh_tokens"} {
+		query := database.Rebind("DELETE FROM " + table + " WHERE expires_at < ?")
+		res, err := tx.Exec(query, time.Now())
+		if err != nil {
+			return 0, err
+		}
+		count, err := res.RowsAffected()
+		if err != nil {
+			return 0, err
+		}
+		deleted += count
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return deleted, nil
 }
 
 // CreateRefreshToken creates a new refresh token for a user.
@@ -134,9 +150,9 @@ func CreateRefreshToken(userID int64, duration time.Duration) (*types.RefreshTok
 // ErrRefreshTokenSpent reports replay or an expired/revoked refresh token.
 var ErrRefreshTokenSpent = errors.New("refresh token already consumed or expired")
 
-// RotateRefreshToken atomically consumes the presented credential and replaces it.
-// The conditional UPDATE is the concurrency gate: at most one transaction may
-// successfully consume the old token across multiple proxy instances.
+// RotateRefreshToken atomically consumes the presented credential, records its
+// hash as a spent token, and replaces it. A concurrent call can consume it only
+// once; the old token cannot authorize a second refresh.
 func RotateRefreshToken(oldToken string, userID int64, duration time.Duration) (*types.RefreshToken, error) {
 	raw, err := GenerateSecureToken(32)
 	if err != nil {
@@ -149,7 +165,8 @@ func RotateRefreshToken(oldToken string, userID int64, duration time.Duration) (
 		return nil, err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	consume := database.Rebind("UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = ? AND user_id = ? AND is_revoked = FALSE AND expires_at > ?")
+
+	consume := database.Rebind("DELETE FROM refresh_tokens WHERE token = ? AND user_id = ? AND expires_at > ?")
 	res, err := tx.Exec(consume, database.TokenHash(oldToken), userID, now)
 	if err != nil {
 		return nil, err
@@ -161,10 +178,8 @@ func RotateRefreshToken(oldToken string, userID int64, duration time.Duration) (
 	if count != 1 {
 		return nil, ErrRefreshTokenSpent
 	}
-	// The current schema permits one refresh token per user. The consumed
-	// row is deleted in the same transaction; replay cannot win the CAS.
-	remove := database.Rebind("DELETE FROM refresh_tokens WHERE user_id = ?")
-	if _, err := tx.Exec(remove, userID); err != nil {
+	record := database.Rebind("INSERT INTO consumed_refresh_tokens (token_hash, user_id, expires_at, consumed_at) VALUES (?, ?, ?, ?)")
+	if _, err := tx.Exec(record, database.TokenHash(oldToken), userID, now.Add(duration), now); err != nil {
 		return nil, err
 	}
 	insert := database.Rebind("INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)")
@@ -177,13 +192,40 @@ func RotateRefreshToken(oldToken string, userID int64, duration time.Duration) (
 	return &types.RefreshToken{UserID: userID, Token: raw, ExpiresAt: expiresAt}, nil
 }
 
+// RevokeOnRefreshReplay revokes the current refresh credential if a previously
+// spent token is submitted. Unknown values do not affect any account.
+func RevokeOnRefreshReplay(raw string) (bool, error) {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	find := database.Rebind("SELECT user_id FROM consumed_refresh_tokens WHERE token_hash = ? AND expires_at > ?")
+	var userID int64
+	err = tx.QueryRow(find, database.TokenHash(raw), time.Now()).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	revoke := database.Rebind("DELETE FROM refresh_tokens WHERE user_id = ?")
+	if _, err := tx.Exec(revoke, userID); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // GetRefreshTokenByToken retrieves a refresh token by its token string.
 func GetRefreshTokenByToken(tokenString string) (*types.RefreshToken, error) {
-	query := database.Rebind("SELECT id, user_id, token, expires_at, is_revoked FROM refresh_tokens WHERE token = ?")
+	query := database.Rebind("SELECT id, user_id, token, expires_at FROM refresh_tokens WHERE token = ?")
 	row := database.DB.QueryRow(query, database.TokenHash(tokenString))
 
 	token := &types.RefreshToken{}
-	err := row.Scan(&token.ID, &token.UserID, &token.Token, &token.ExpiresAt, &token.IsRevoked)
+	err := row.Scan(&token.ID, &token.UserID, &token.Token, &token.ExpiresAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Not found
