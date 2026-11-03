@@ -90,6 +90,12 @@ func bearerAuth(next http.Handler, allowAdminCookie bool) http.Handler {
 				return
 			}
 
+			if !utils.JWTMatchesCredentials(payload, user) {
+				logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "JWT credentials revoked", "user_id", user.ID, "path", r.URL.Path, "ip", ip)
+				http.Error(w, "Unauthorized: Access token revoked", http.StatusUnauthorized)
+				return
+			}
+
 			if !user.IsActive {
 				logging.SecurityLog.Warn("API ACCESS DENIED", "reason", "user is inactive", "user_id", user.ID, "path", r.URL.Path, "ip", ip)
 				http.Error(w, "Forbidden: User account is inactive", http.StatusForbidden)

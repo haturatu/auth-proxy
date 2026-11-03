@@ -556,3 +556,7 @@ Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md
 ### Logout endpoint
 
 Logout is a state-changing operation: only `POST` is supported, and the browser form submits a logout-scoped XSRF token. `GET /logout` deliberately returns `405 Method Not Allowed` to prevent cross-site logout requests.
+
+### Password-change credential revocation
+
+After a successful password change, all stored browser sessions and refresh tokens for that user are revoked atomically with the password update. The caller's session cookie is cleared. Access JWTs are bound to the current password credential state and become invalid on the next authenticated request. Older JWTs lacking `cv` are intentionally rejected; clients must sign in again.
