@@ -20,7 +20,6 @@ func NewWorkerPool() *types.WorkerPool {
 	pool := &types.WorkerPool{
 		Workers:    numWorkers,
 		TaskQueue:  make(chan func(), numWorkers*2),
-		ResultChan: make(chan interface{}, numWorkers*2),
 		Active:     0,
 	}
 
