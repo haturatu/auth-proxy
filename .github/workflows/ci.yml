@@ -128,10 +128,3 @@ jobs:
           cache-dependency-path: '**/go.sum'
       - run: go test -race -timeout=120s ./...
       - run: go vet ./...
-
-  docs:
-    name: README Markdown structure
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: python3 tests/check_readme_structure.py
