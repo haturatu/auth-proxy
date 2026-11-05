@@ -60,7 +60,7 @@ func testService(t *testing.T, source ...string) (*Service, *types.User) {
 			return nil, errInvalid
 		}
 		return models.GetUserByID(user.ID)
-	}, &types.RateLimiter{Requests: make(map[string][]int64), Max: 1000, Window: time.Minute})
+	}, &types.RateLimiter{Requests: make(map[string][]int64), Max: 1000, Window: time.Minute}, &types.RateLimiter{Requests: make(map[string][]int64), Max: 1000, Window: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,6 +196,9 @@ func TestGatewayCSRFAndNavigationPolicy(t *testing.T) {
 	}
 	h := appHeaders(s, "app-a")
 	h["X-Original-Accept"] = "application/json"
+	requireCode(t, request(s, "GET", "/gateway/start", nil, h, ""), 401)
+	h = appHeaders(s, "app-a")
+	h["X-Original-URI"] = "/api/items"
 	requireCode(t, request(s, "GET", "/gateway/start", nil, h, ""), 401)
 	h = appHeaders(s, "app-a")
 	h["X-Original-Host"] = "app-b.other.net"
@@ -571,4 +574,32 @@ func TestConfidentialClientRequiresBasicAuthenticationAndPKCE(t *testing.T) {
 	requireCode(t, request(s, "POST", "/oauth2/token", nil, headers, form.Encode()), 401)
 	headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(url.QueryEscape(a.ID)+":"+url.QueryEscape(secret)))
 	requireCode(t, request(s, "POST", "/oauth2/token", nil, headers, form.Encode()), 200)
+}
+
+func TestRegistrationKeepsNewAccountsSeparateFromCredentialManagement(t *testing.T) {
+	s, user := testService(t)
+	raw, err := s.createSSO(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cookies := []*http.Cookie{{Name: ssoCookie, Value: raw}}
+	w := request(s, "GET", "/sso/login", cookies, nil, "")
+	requireCode(t, w, 200)
+	if strings.Contains(w.Body.String(), `id="passkey-register"`) {
+		t.Fatal("new-account registration shown inside an existing account")
+	}
+	requireCode(t, request(s, "POST", "/webauthn/register/begin", cookies, map[string]string{"Origin": s.config.Issuer}, `{"username":"another-user"}`), 400)
+	config.Paths.RegisterEnabled = false
+	requireCode(t, request(s, "POST", "/webauthn/register/begin", nil, map[string]string{"Origin": s.config.Issuer}, `{"username":"another-user"}`), 403)
+}
+
+func TestPasskeyRegistrationAlsoHonorsAccountCreationLimits(t *testing.T) {
+	s, _ := testService(t)
+	s.registrationLimiter.Max = 1
+	headers := map[string]string{"Origin": s.config.Issuer}
+	begin := request(s, "POST", "/webauthn/register/begin", nil, headers, `{"username":"new-user"}`)
+	requireCode(t, begin, 200)
+	requireCode(t, request(s, "POST", "/webauthn/register/begin", nil, headers, `{"username":"other-user"}`), 429)
+	// Completing the already-counted ceremony must still reach verification.
+	requireCode(t, request(s, "POST", "/webauthn/register/finish", begin.Result().Cookies(), headers, `{}`), 400)
 }

@@ -103,6 +103,10 @@ func (s *Service) registerBegin(w http.ResponseWriter, r *http.Request) {
 	parent, user, err := s.currentSSO(r)
 	var flow ceremony
 	if err == nil {
+		if input.Username != "" {
+			http.Error(w, "Sign out before creating another account", http.StatusBadRequest)
+			return
+		}
 		if time.Now().Unix()-parent.AuthTime > int64(flowLifetime.Seconds()) {
 			http.Error(w, "Sign in again before adding a passkey", http.StatusUnauthorized)
 			return

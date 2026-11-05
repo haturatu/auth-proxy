@@ -41,20 +41,21 @@ var errInvalid = errors.New("invalid or expired credential")
 type PasswordAuthenticator func(username, password, ip string) (*types.User, error)
 
 type Service struct {
-	config     *config.SSOConfig
-	wa         *webauthn.WebAuthn
-	key        *rsa.PrivateKey
-	kid        string
-	box        cipher.AEAD
-	peers      []*net.IPNet
-	issuerHost string
-	password   PasswordAuthenticator
-	handler    http.Handler
+	config              *config.SSOConfig
+	wa                  *webauthn.WebAuthn
+	key                 *rsa.PrivateKey
+	kid                 string
+	box                 cipher.AEAD
+	peers               []*net.IPNet
+	issuerHost          string
+	password            PasswordAuthenticator
+	registrationLimiter *types.RateLimiter
+	handler             http.Handler
 }
 
 // New requires a persistent RSA signing key so restarts and multiple replicas
 // publish the same JWKS. No ephemeral production signing keys are generated.
-func New(c *config.SSOConfig, password PasswordAuthenticator, limiter *types.RateLimiter) (*Service, error) {
+func New(c *config.SSOConfig, password PasswordAuthenticator, limiter, registrationLimiter *types.RateLimiter) (*Service, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func New(c *config.SSOConfig, password PasswordAuthenticator, limiter *types.Rat
 	}
 	u, _ := url.Parse(c.Issuer)
 	digest := sha256.Sum256(x509.MarshalPKCS1PublicKey(&key.PublicKey))
-	s := &Service{config: c, key: key, kid: base64.RawURLEncoding.EncodeToString(digest[:16]), box: box, wa: wa, issuerHost: u.Host, password: password}
+	s := &Service{config: c, key: key, kid: base64.RawURLEncoding.EncodeToString(digest[:16]), box: box, wa: wa, issuerHost: u.Host, password: password, registrationLimiter: registrationLimiter}
 	for _, cidr := range c.TrustedGatewayCIDRs {
 		_, network, _ := net.ParseCIDR(cidr)
 		s.peers = append(s.peers, network)
@@ -115,7 +116,7 @@ func (s *Service) routes(limiter *types.RateLimiter) http.Handler {
 	mux.HandleFunc("GET /sso/assets/style.css", s.stylesheet)
 	mux.HandleFunc("POST /sso/password", s.passwordLogin)
 	mux.HandleFunc("POST /sso/logout", s.logout)
-	mux.HandleFunc("POST /webauthn/register/begin", s.registerBegin)
+	mux.Handle("POST /webauthn/register/begin", middleware.RateLimitMiddleware(s.registrationLimiter)(http.HandlerFunc(s.registerBegin)))
 	mux.HandleFunc("POST /webauthn/register/finish", s.registerFinish)
 	mux.HandleFunc("POST /webauthn/login/begin", s.loginBegin)
 	mux.HandleFunc("POST /webauthn/login/finish", s.loginFinish)

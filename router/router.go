@@ -72,7 +72,7 @@ func NewRouterChecked(rateLimiter, loginLimiter *types.RateLimiter) (http.Handle
 	if c, err := config.LoadSSO(); err != nil {
 		return nil, err
 	} else if c != nil {
-		identity, err = sso.New(c, handlers.AuthenticatePassword, loginLimiter)
+		identity, err = sso.New(c, handlers.AuthenticatePassword, loginLimiter, rateLimiter)
 		if err != nil {
 			return nil, err
 		}

@@ -73,7 +73,7 @@ Compose 設定例では公開登録を無効にしています。既存のユー
 
 認証チェックは `X-Auth-App-ID` と `X-Original-Host` の組み合わせを登録情報と照合します。Nginx は内部ヘッダーを上書きし、元のメソッド、Origin、Fetch Metadata と WebSocket Upgrade を転送します。
 
-未認証時は名前付き location の `@sso_start` を使います。通常の `error_page` による URI への内部転送では POST が GET に変わるため、元のメソッドを失うおそれがあります。設定例は元のメソッドを保持し、認証サービスへの呼び出しだけを `proxy_method GET` に変更します。POST を保存・再送する機能はありません。API、fetch、HEAD、POST、WebSocket をログインへリダイレクトしません。
+未認証時は名前付き location の `@sso_start` を使います。通常の `error_page` による URI への内部転送では POST が GET に変わるため、元のメソッドを失うおそれがあります。設定例は元のメソッドを保持し、認証サービスへの呼び出しだけを `proxy_method GET` に変更します。POST を保存・再送する機能はありません。API、fetch、HEAD、POST、WebSocket をログインへリダイレクトしません。`API_PATH` 配下（既定は `/api/`）は HTML ナビゲーションでも 401 を返します。それ以外の API は JSON の Accept または Fetch Metadata により画面遷移と区別します。
 
 変更系リクエストと WebSocket 接続には、アプリの Origin と完全一致する Origin ヘッダーが必要です。クロスオリジンの fetch、同一サイト内の別ホストからの fetch も拒否します。アプリ側の CSRF 対策も維持してください。アプリが GET で状態を変更する設計は、この境界で保護できません。既に確立した WebSocket やストリームは、ログアウト時に切断されません。新しい接続・リクエストで認証状態を再確認します。
 
@@ -82,6 +82,8 @@ Compose 設定例では公開登録を無効にしています。既存のユー
 認証チェックの応答に含まれる `X-Auth-Request-Cookie` は、サービス所有 Cookie を取り除いた Cookie ヘッダーです。Nginx はこの値だけをアプリに送ります。アプリ独自の Cookie は維持されます。アプリが auth-proxy 所有の Cookie 名を使用しないようにしてください。
 
 認証 DB への接続に失敗した場合、内部 API は 503 を返し、Nginx はアクセスを許可しません。認証チェックはログイン用レート制限の対象外なので、ログイン失敗が既存のアプリセッションを遮断することはありません。公開認証操作には既存の `AUTH_RATE_LIMIT_*` 設定を適用します。
+
+パスキー登録の開始には、既存の `USER_CREATION_RATE_LIMIT_*` による制限も適用します。既に開始した登録の完了は、この追加枠を消費しません。
 
 アクセスログにはクエリー文字列を出力しません。Nginx のコールバック location では、認可コードを含み得る標準エラーログも無効にしています。DEBUG・INFO は stdout、WARN・ERROR は stderr に出力し、起動不能時は終了コード 1 を返します。
 

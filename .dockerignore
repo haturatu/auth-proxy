@@ -4,6 +4,9 @@
 .env.*
 *.db
 *.db-*
+*.pem
+*.key
+examples/sso/tls
 auth-proxy-server
 admin-cli
 docs

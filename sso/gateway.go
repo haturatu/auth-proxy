@@ -139,6 +139,15 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid return path", http.StatusBadRequest)
 		return
 	}
+	parsed, _ := url.ParseRequestURI(path)
+	apiPrefix := strings.TrimRight(config.Paths.APIPath, "/")
+	if apiPrefix == "" {
+		apiPrefix = "/api"
+	}
+	if parsed.Path == apiPrefix || strings.HasPrefix(parsed.Path, apiPrefix+"/") {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	state, binding, nonce, verifier := randomToken(), randomToken(), randomToken(), randomToken()
 	f := gatewayFlow{AppID: a.ID, BindingHash: database.TokenHash(binding), Verifier: verifier, Nonce: nonce, ReturnPath: path}
 	if err = s.putFlow("gateway", state, &f); err != nil {

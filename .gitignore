@@ -7,3 +7,8 @@ auth.db
 
 # .env file
 .env
+
+# SSO signing keys and deployment TLS material
+*.pem
+*.key
+/examples/sso/tls/

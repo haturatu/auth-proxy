@@ -14,8 +14,13 @@ var assets embed.FS
 var pages = template.Must(template.ParseFS(assets, "assets/*.html"))
 
 func (s *Service) loginPage(w http.ResponseWriter, r *http.Request) {
+	_, user, err := s.currentSSO(r)
+	if err != nil && !errors.Is(err, errInvalid) {
+		unavailable(w, err)
+		return
+	}
 	if flow := r.URL.Query().Get("flow"); flow != "" {
-		if _, _, err := s.currentSSO(r); err == nil {
+		if user != nil {
 			redirect, err := s.continuation(flow)
 			if err != nil {
 				http.Error(w, "Login request expired; open the application again", http.StatusBadRequest)
@@ -23,13 +28,10 @@ func (s *Service) loginPage(w http.ResponseWriter, r *http.Request) {
 			}
 			http.Redirect(w, r, redirect, http.StatusFound)
 			return
-		} else if !errors.Is(err, errInvalid) {
-			unavailable(w, err)
-			return
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := pages.ExecuteTemplate(w, "login.html", map[string]any{"Register": config.Paths.RegisterEnabled}); err != nil {
+	if err := pages.ExecuteTemplate(w, "login.html", map[string]any{"Register": config.Paths.RegisterEnabled && user == nil, "User": user}); err != nil {
 		unavailable(w, err)
 	}
 }
