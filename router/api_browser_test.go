@@ -45,6 +45,9 @@ func TestEventSourceCookieOnlyViaRouter(t *testing.T) {
 		database.TokenHash("browser-session"), now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.MigrateIdentity(); err != nil {
+		t.Fatal(err)
+	}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/events" {
 			t.Errorf("unexpected path: %s", r.URL.Path)

@@ -25,10 +25,22 @@ func Validate() error {
 		return fmt.Errorf("XSRF_SECRET_KEY must be a base64-encoded 32-byte key")
 	}
 	target, err := url.Parse(os.Getenv("TARGET_URL"))
-	if err != nil || target.Host == "" || (target.Scheme != "http" && target.Scheme != "https") || target.User != nil {
-		return fmt.Errorf("TARGET_URL must be an absolute http(s) URL without userinfo")
+	if os.Getenv("TARGET_URL") != "" || os.Getenv("SSO_CONFIG") == "" {
+		if err != nil || target.Host == "" || (target.Scheme != "http" && target.Scheme != "https") || target.User != nil {
+			return fmt.Errorf("TARGET_URL must be an absolute http(s) URL without userinfo")
+		}
+	}
+	if c, err := LoadSSO(); err != nil {
+		return fmt.Errorf("invalid SSO configuration: %w", err)
+	} else if c != nil {
+		if _, err = LoadSSOSigningKey(); err != nil {
+			return err
+		}
 	}
 	apiPath := getEnv("API_PATH", "/api/")
+	if os.Getenv("SSO_CONFIG") != "" && SSOPath(apiPath) {
+		return fmt.Errorf("API_PATH conflicts with an SSO namespace")
+	}
 	if !strings.HasPrefix(apiPath, "/") || !strings.HasSuffix(apiPath, "/") || apiPath == "/" ||
 		strings.Contains(apiPath, "//") || strings.ContainsAny(apiPath, "?#%") || strings.Contains(apiPath, "..") {
 		return fmt.Errorf("API_PATH must be an absolute non-root URL prefix ending in /")
@@ -46,6 +58,9 @@ func Validate() error {
 	seen := make(map[string]string, len(paths))
 	for _, entry := range paths {
 		p := entry.value
+		if os.Getenv("SSO_CONFIG") != "" && SSOPath(p) {
+			return fmt.Errorf("%s conflicts with an SSO namespace", entry.key)
+		}
 		if p == "" || !strings.HasPrefix(p, "/") || p == "/" ||
 			strings.ContainsAny(p, "?#%") || strings.Contains(p, "//") || strings.Contains(p, "..") {
 			return fmt.Errorf("%s must be an absolute, canonical non-root path", entry.key)

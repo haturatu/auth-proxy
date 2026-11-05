@@ -1,7 +1,9 @@
 package logging
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -28,8 +30,36 @@ func InitLoggers() {
 	case "ERROR":
 		level = slog.LevelError
 	}
-	AppLog = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
-	SecurityLog = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	handler := newStreamHandler(os.Stdout, os.Stderr, level)
+	AppLog = slog.New(handler)
+	SecurityLog = slog.New(handler)
+}
+
+// streamHandler keeps DEBUG/INFO on stdout and WARN/ERROR on stderr while
+// preserving the configured minimum level and slog attributes/groups.
+type streamHandler struct{ out, err slog.Handler }
+
+func newStreamHandler(out, err io.Writer, level slog.Level) slog.Handler {
+	options := &slog.HandlerOptions{Level: level}
+	return &streamHandler{out: slog.NewTextHandler(out, options), err: slog.NewTextHandler(err, options)}
+}
+func (h *streamHandler) target(level slog.Level) slog.Handler {
+	if level >= slog.LevelWarn {
+		return h.err
+	}
+	return h.out
+}
+func (h *streamHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.target(level).Enabled(ctx, level)
+}
+func (h *streamHandler) Handle(ctx context.Context, r slog.Record) error {
+	return h.target(r.Level).Handle(ctx, r)
+}
+func (h *streamHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &streamHandler{out: h.out.WithAttrs(attrs), err: h.err.WithAttrs(attrs)}
+}
+func (h *streamHandler) WithGroup(name string) slog.Handler {
+	return &streamHandler{out: h.out.WithGroup(name), err: h.err.WithGroup(name)}
 }
 
 // ConfigureTrustedProxies accepts only the addresses of immediate, controlled reverse proxies.

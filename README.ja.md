@@ -1,5 +1,7 @@
 セキュリティ設定（VLAN間の直接アクセスを含む）: [SECURITY.md](SECURITY.md)。
 
+Nginx を使ったパスキー認証と複数ドメイン SSO は、[導入・移行ガイド](docs/passkey-sso.ja.md)を参照してください。設定で有効にすると、OIDC Authorization Code Flow と PKCE、独立したアプリセッションを利用できます。
+
 [English](README.md)
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
@@ -523,7 +525,7 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 
 | 環境変数 | 説明 | デフォルト値 |
 | --- | --- | --- |
-| `TARGET_URL` | **(必須)** プロキシ先のバックエンドサービスのURL。 | - |
+| `TARGET_URL` | プロキシ先のバックエンドサービスの URL。`SSO_CONFIG` による認証基盤の単独起動時は省略できます。 | - |
 | `SESSION_SECRET` | **(必須)** 32文字以上のランダムな秘密鍵。JWT署名鍵はHKDFで導出されます。 | - |
 | `DATABASE_URL` | PostgreSQLまたはMySQLの接続文字列。設定されている場合、`DATABASE_PATH`より優先されます。 | - |
 | `DATABASE_PATH` | SQLiteデータベースのファイルパス。`DATABASE_URL`が設定されていない場合のみ使用されます。 | `./auth.db` |
@@ -561,4 +563,4 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/config
 
 ### パスワード変更時の認証情報失効
 
-パスワードを変更するとDB上のブラウザセッションとリフレッシュトークンが失効し、Cookieも削除されます。アクセストークンも次の認証リクエストで無効化され、`cv` がない旧JWTも拒否されます。
+パスワードを変更すると、DB 上のブラウザー・SSO・アプリセッションとリフレッシュトークンが失効し、Cookie も削除されます。アクセストークンはユーザーの認証情報バージョンに紐付き、次の認証リクエストで無効になります。パスキーの追加・削除でもこのバージョンが更新されます。認証情報バージョンへの移行前に発行したアクセス JWT は再発行が必要です。

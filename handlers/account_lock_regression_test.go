@@ -43,6 +43,9 @@ func TestDisabledAccountNeverUnlocksByLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := database.MigrateIdentity(); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := authenticateUser("blocked", "valid-password-123", "192.0.2.10"); err == nil {
 		t.Fatal("administrator-disabled account accepted a login")
 	}
@@ -92,6 +95,9 @@ func TestExpiredTemporaryLockDoesNotDisableAccount(t *testing.T) {
 	t.Cleanup(func() { config.Paths = oldPaths })
 	config.Paths.MaxLoginAttempts = 5
 	config.Paths.LockoutDurationMinutes = 10
+	if err := database.MigrateIdentity(); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := authenticateUser("active", "valid-password-123", "192.0.2.10"); err != nil {
 		t.Fatalf("expired temporary lock was not cleared: %v", err)
 	}

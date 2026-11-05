@@ -45,6 +45,9 @@ func setupBrowserSession(t *testing.T) (string, string) {
 		time.Now(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.MigrateIdentity(); err != nil {
+		t.Fatal(err)
+	}
 	const session = "browser-cookie-session"
 	if _, err := database.DB.Exec("INSERT INTO auth_tokens (user_id, token, expires_at) VALUES (5, ?, ?)",
 		database.TokenHash(session), time.Now().Add(time.Hour)); err != nil {

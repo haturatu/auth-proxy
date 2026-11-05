@@ -1,0 +1,47 @@
+# Linux host networking matches the loopback upstreams in nginx/nginx.conf.
+# Run the application backends on 127.0.0.1:8081 and 127.0.0.1:8082.
+services:
+  auth-proxy:
+    build:
+      context: ../..
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      LISTEN_HOST: 127.0.0.1
+      LISTEN_PORT: '8080'
+      TARGET_URL: ''
+      SSO_CONFIG: /run/auth-proxy/sso.yaml
+      SSO_SIGNING_KEY_FILE: /run/secrets/sso-signing-key
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
+      XSRF_SECRET_KEY: ${XSRF_SECRET_KEY:?Set XSRF_SECRET_KEY}
+      DATABASE_PATH: /data/auth.db
+      COOKIE_SECURE: 'true'
+      ALLOWED_HOSTS: auth.example.com,127.0.0.1:8080
+      TRUSTED_PROXY_CIDRS: 127.0.0.1/32
+      REGISTER: ${REGISTER:-false}
+    volumes:
+      - ./config.yaml:/run/auth-proxy/sso.yaml:ro
+      - sso_data:/data
+    secrets:
+      - source: sso_signing_key
+        target: sso-signing-key
+
+  nginx:
+    image: nginx:stable-alpine
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      auth-proxy:
+        condition: service_healthy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ${SSO_TLS_DIR:?Set SSO_TLS_DIR}:/etc/nginx/tls:ro
+
+secrets:
+  sso_signing_key:
+    file: ${SSO_SIGNING_KEY_FILE:?Set SSO_SIGNING_KEY_FILE}
+
+volumes:
+  sso_data:

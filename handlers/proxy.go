@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"auth-proxy/logging"
+	"auth-proxy/middleware"
 	"auth-proxy/types"
 	"auth-proxy/utils"
 	"auth-proxy/worker"
@@ -66,7 +67,7 @@ func NewProxy(targetURL string) http.Handler {
 			pr.Out.Header.Del("Cookie")
 			var appCookies []string
 			for _, cookie := range pr.In.Cookies() {
-				if cookie.Name == "auth_token" || cookie.Name == "anon_xsrf" {
+				if middleware.IsAuthCookie(cookie.Name) {
 					continue
 				}
 				appCookies = append(appCookies, cookie.String())

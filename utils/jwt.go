@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"auth-proxy/config"
 	"auth-proxy/types"
 	"crypto/hkdf"
 	"crypto/hmac"
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -42,19 +44,22 @@ func jwtAudience() string {
 	if target, err := url.Parse(os.Getenv("TARGET_URL")); err == nil && target.Host != "" {
 		return "auth-proxy:" + target.Host
 	}
+	if config.Paths.SSOIssuer != "" {
+		return "auth-proxy:" + config.Paths.SSOIssuer
+	}
 	return "auth-proxy:local-test"
 }
 
-// credentialTag binds each JWT to the server's current password hash.
-// The tag is keyed so it reveals nothing about the password hash.
-func credentialTag(key []byte, passwordHash string) string {
+// credentialTag binds each JWT to the user credential version.
+// The keyed tag invalidates all previously issued JWTs after any credential mutation.
+func credentialTag(key []byte, version string) string {
 	h := hmac.New(sha256.New, key)
-	_, _ = h.Write([]byte("auth-proxy/password-credential/v1:"))
-	_, _ = h.Write([]byte(passwordHash))
+	_, _ = h.Write([]byte("auth-proxy/credentials-version/v2:"))
+	_, _ = h.Write([]byte(version))
 	return base64Encode(h.Sum(nil)[:16])
 }
 
-// JWTMatchesCredentials rejects JWTs minted before a password change.
+// JWTMatchesCredentials rejects JWTs minted before a credential version change.
 func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
 	if payload == nil || user == nil || payload.CredentialTag == "" {
 		return false
@@ -63,7 +68,7 @@ func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
 	if err != nil {
 		return false
 	}
-	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, user.PasswordHash)))
+	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, strconv.FormatInt(user.CredentialsVersion, 10))))
 }
 
 func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
@@ -78,7 +83,7 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 	now := time.Now()
 	payloadJSON, err := json.Marshal(types.JWTPayload{
 		Issuer: "auth-proxy", Audience: jwtAudience(), IssuedAt: now.Unix(), NotBefore: now.Unix(),
-		UserID: user.ID, Exp: now.Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
+		UserID: user.ID, Exp: now.Add(duration).Unix(), CredentialTag: credentialTag(key, strconv.FormatInt(user.CredentialsVersion, 10)),
 	})
 	if err != nil {
 		return "", err

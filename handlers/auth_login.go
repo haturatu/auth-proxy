@@ -17,6 +17,12 @@ import (
 // package tests running from the handlers/ working directory.
 var templates = loadTemplates()
 
+// AuthenticatePassword shares password policy, lockout and audit handling with
+// the opt-in identity provider.
+func AuthenticatePassword(username, password, ip string) (*types.User, error) {
+	return authenticateUser(username, password, ip)
+}
+
 func loadTemplates() *template.Template {
 	pattern := "templates/*.html"
 	if _, err := os.Stat("templates"); errors.Is(err, os.ErrNotExist) {

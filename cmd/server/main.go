@@ -9,6 +9,7 @@ import (
 	"auth-proxy/router"
 	"auth-proxy/worker"
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -49,7 +50,11 @@ func main() {
 
 	rateLimiter := middleware.NewRateLimiter()
 	loginLimiter := middleware.NewLoginRateLimiter()
-	mainRouter := router.NewRouter(rateLimiter, loginLimiter)
+	mainRouter, err := router.NewRouterChecked(rateLimiter, loginLimiter)
+	if err != nil {
+		logging.AppLog.Error("Failed to initialize authentication", "error", err)
+		os.Exit(1)
+	}
 	go router.StartBackgroundTasks(pool, rateLimiter, loginLimiter)
 
 	mux := http.NewServeMux()
@@ -68,7 +73,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	listenAddr := ":" + port
+	listenAddr := net.JoinHostPort(os.Getenv("LISTEN_HOST"), port)
 	logging.AppLog.Info("Server starting on " + listenAddr)
 	srv := &http.Server{
 		Addr:                listenAddr,

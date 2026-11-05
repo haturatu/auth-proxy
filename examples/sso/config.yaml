@@ -1,0 +1,24 @@
+issuer: https://auth.example.com
+
+webauthn:
+  rp_id: auth.example.com
+  origins:
+    - https://auth.example.com
+
+# Use the exact source addresses with which Nginx connects to auth-proxy.
+# The auth-proxy listener must also be on a private network/firewalled.
+trusted_gateway_cidrs:
+  - 127.0.0.1/32
+  - ::1/128
+
+applications:
+  - id: app-a
+    origin: https://app-a.example.com
+    redirect_uri: https://app-a.example.com/_auth/callback
+    roles: [user, admin]
+    # Optional for external OIDC token requests (client_secret_basic).
+    # client_secret_env: APP_A_OIDC_SECRET
+  - id: app-b
+    origin: https://app-b.other.net
+    redirect_uri: https://app-b.other.net/_auth/callback
+    roles: [admin]

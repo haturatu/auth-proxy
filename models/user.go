@@ -71,28 +71,46 @@ func CreateUser(username, password, role string) (*types.User, error) {
 		return nil, err
 	}
 
-	query := database.Rebind("INSERT INTO users(username, password_hash, role) VALUES(?, ?, ?)")
-	stmt, err := database.DB.Prepare(query)
+	return createUserWithCredential(username, passwordHash, role)
+}
+
+// CreatePasskeyUser creates an account without a password credential. Callers
+// must complete a verified WebAuthn registration in the same controlled flow.
+func CreatePasskeyUser(username, role string) (*types.User, error) {
+	return createUserWithCredential(username, "", role)
+}
+
+func createUserWithCredential(username, passwordHash, role string) (*types.User, error) {
+	tx, err := database.DB.Begin()
 	if err != nil {
 		return nil, err
 	}
-	defer stmt.Close() //nolint:errcheck
-
-	_, err = stmt.Exec(username, passwordHash, role)
-	if err != nil {
+	defer tx.Rollback() //nolint:errcheck
+	if _, err = tx.Exec(database.Rebind("INSERT INTO users(username, password_hash, role) VALUES(?, '', ?)"), username, role); err != nil {
 		return nil, err
 	}
-
-	return GetUserByUsername(username) // Return the full user object
+	var id int64
+	if err = tx.QueryRow(database.Rebind("SELECT id FROM users WHERE username = ?"), username).Scan(&id); err != nil {
+		return nil, err
+	}
+	if passwordHash != "" {
+		if _, err = tx.Exec(database.Rebind("INSERT INTO password_credentials (user_id, password_hash) VALUES (?, ?)"), id, passwordHash); err != nil {
+			return nil, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return GetUserByID(id)
 }
 
 // baseSelectQuery is the common set of columns for user queries
-const baseSelectQuery = "SELECT id, username, password_hash, role, is_active, failed_logins, locked_until, last_login_at, created_at, updated_at FROM users"
+const baseSelectQuery = "SELECT id, username, COALESCE((SELECT password_hash FROM password_credentials WHERE user_id = users.id), ''), role, is_active, failed_logins, locked_until, last_login_at, created_at, updated_at, credentials_version FROM users"
 
 // scanUser scans a row into a User struct
 func scanUser(row *sql.Row) (*types.User, error) {
 	user := &types.User{}
-	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt, &user.CredentialsVersion)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // User not found
@@ -127,7 +145,7 @@ func GetAllUsers() ([]types.User, error) {
 	var users []types.User
 	for rows.Next() {
 		var user types.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LockedUntil, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt, &user.CredentialsVersion); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -156,11 +174,17 @@ func UpdateUserPassword(id int64, passwordHash string) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	update := database.Rebind("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-	if _, err := tx.Exec(update, passwordHash, id); err != nil {
+	update := database.Rebind("UPDATE users SET credentials_version = credentials_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+	if _, err := tx.Exec(update, id); err != nil {
 		return err
 	}
-	for _, table := range []string{"auth_tokens", "refresh_tokens"} {
+	if _, err := tx.Exec(database.Rebind("DELETE FROM password_credentials WHERE user_id = ?"), id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(database.Rebind("INSERT INTO password_credentials (user_id, password_hash) VALUES (?, ?)"), id, passwordHash); err != nil {
+		return err
+	}
+	for _, table := range []string{"auth_tokens", "refresh_tokens", "app_sessions", "sso_sessions"} {
 		revoke := database.Rebind("DELETE FROM " + table + " WHERE user_id = ?")
 		if _, err := tx.Exec(revoke, id); err != nil {
 			return err

@@ -6,6 +6,7 @@ import (
 	"auth-proxy/logging"
 	"auth-proxy/middleware"
 	"auth-proxy/models"
+	"auth-proxy/sso"
 	"auth-proxy/types"
 	"auth-proxy/worker"
 	"net/http"
@@ -56,7 +57,26 @@ func allowedRequestHost(host string) bool {
 
 // NewRouter creates and configures the main application router.
 func NewRouter(rateLimiter, loginLimiter *types.RateLimiter) http.Handler {
+	h, err := NewRouterChecked(rateLimiter, loginLimiter)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}
+
+// NewRouterChecked reports initialization failures to the server so fatal
+// configuration/database errors are logged to stderr and exit with status 1.
+func NewRouterChecked(rateLimiter, loginLimiter *types.RateLimiter) (http.Handler, error) {
 	targetURL := os.Getenv("TARGET_URL")
+	var identity *sso.Service
+	if c, err := config.LoadSSO(); err != nil {
+		return nil, err
+	} else if c != nil {
+		identity, err = sso.New(c, handlers.AuthenticatePassword, loginLimiter, rateLimiter)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Browser CSRF defense is scoped to our own UI/admin endpoints, not to
 	// arbitrary proxied traffic (WebDAV, APIs, streaming, etc.).
@@ -177,12 +197,34 @@ func NewRouter(rateLimiter, loginLimiter *types.RateLimiter) http.Handler {
 			http.Error(w, "Misdirected Request", http.StatusMisdirectedRequest)
 			return
 		}
+
 		// Always dispatch the service-owned API routes before any proxy fallback.
 		// In particular, a custom admin API path must never bypass the
 		// AdminBearerAuth/AdminMiddleware chain when it is outside API_PATH.
 		if _, pattern := apiMux.Handler(r); pattern != "" {
 			apiMux.ServeHTTP(w, r)
 			return
+		}
+		if sso.Owns(r.URL.Path) {
+			if identity == nil {
+				http.NotFound(w, r)
+			} else {
+				identity.ServeHTTP(w, r)
+			}
+			return
+		}
+		if targetURL == "" {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, "/sso/account", http.StatusFound)
+				return
+			}
+			// Existing local user/admin routes remain available in IdP-only mode.
+			if _, pattern := webMux.Handler(r); pattern == "" {
+				if _, pattern := apiMux.Handler(r); pattern == "" {
+					http.NotFound(w, r)
+					return
+				}
+			}
 		}
 		// Handle proxied API paths. Service-owned routes were dispatched above.
 		if isAPIPath(r.URL.Path, config.Paths.APIPath) {
@@ -218,7 +260,7 @@ func NewRouter(rateLimiter, loginLimiter *types.RateLimiter) http.Handler {
 		}
 	})
 
-	return finalHandler
+	return finalHandler, nil
 }
 
 // StartBackgroundTasks launches periodic jobs for cleanup.
@@ -253,6 +295,9 @@ func StartBackgroundTasks(pool *types.WorkerPool, limiter, loginLimiter *types.R
 // submitTokenCleanup submits the expired token deletion task to the worker pool.
 func submitTokenCleanup(pool *types.WorkerPool) {
 	worker.Submit(pool, func() {
+		if err := sso.Cleanup(); err != nil {
+			logging.AppLog.Error("Failed to clean up SSO records", "error", err)
+		}
 		logging.AppLog.Info("Running background task: deleting expired tokens")
 		rowsAffected, err := models.DeleteExpiredTokens()
 		if err != nil {

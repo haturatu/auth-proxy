@@ -29,6 +29,9 @@ func TestBearerTokensStoredOnlyAsHashes(t *testing.T) {
 	if _, err := db.Exec("INSERT INTO users VALUES (1, 'alice', 'hash', 'user', 1, 0, NULL, ?, ?)", now, now); err != nil {
 		t.Fatal(err)
 	}
+	if err := database.MigrateIdentity(); err != nil {
+		t.Fatal(err)
+	}
 	session, err := CreateAuthToken(1, time.Hour)
 	if err != nil {
 		t.Fatal(err)
