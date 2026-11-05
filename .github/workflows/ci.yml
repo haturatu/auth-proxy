@@ -30,6 +30,8 @@ jobs:
               - 'middleware/**'
               - 'models/**'
               - 'router/**'
+              - 'sso/**'
+              - 'examples/**'
               - 'templates/**'
               - 'types/**'
               - 'utils/**'
@@ -128,3 +130,31 @@ jobs:
           cache-dependency-path: '**/go.sum'
       - run: go test -race -timeout=120s ./...
       - run: go vet ./...
+
+  sso-e2e:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    name: Nginx / cross-domain passkey SSO
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tests/sso-e2e/package-lock.json
+      - name: Install browser
+        working-directory: tests/sso-e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Exercise real passkeys through the Nginx examples
+        run: bash tests/sso-e2e/run.sh
+      - name: Verify SSO on PostgreSQL and MySQL
+        run: |
+          bash tests/sso-sql.sh postgres
+          bash tests/sso-sql.sh mysql
