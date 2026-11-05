@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -45,7 +46,7 @@ func jwtAudience() string {
 	return "auth-proxy:local-test"
 }
 
-// credentialTag binds each JWT to the server's current password hash.
+// credentialTag binds each JWT to the user credential version.
 // The tag is keyed so it reveals nothing about the password hash.
 func credentialTag(key []byte, passwordHash string) string {
 	h := hmac.New(sha256.New, key)
@@ -63,7 +64,7 @@ func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
 	if err != nil {
 		return false
 	}
-	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, user.PasswordHash)))
+	return hmac.Equal([]byte(payload.CredentialTag), []byte(credentialTag(key, strconv.FormatInt(user.CredentialsVersion, 10))))
 }
 
 func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
@@ -78,7 +79,7 @@ func GenerateJWT(user *types.User, duration time.Duration) (string, error) {
 	now := time.Now()
 	payloadJSON, err := json.Marshal(types.JWTPayload{
 		Issuer: "auth-proxy", Audience: jwtAudience(), IssuedAt: now.Unix(), NotBefore: now.Unix(),
-		UserID: user.ID, Exp: now.Add(duration).Unix(), CredentialTag: credentialTag(key, user.PasswordHash),
+		UserID: user.ID, Exp: now.Add(duration).Unix(), CredentialTag: credentialTag(key, strconv.FormatInt(user.CredentialsVersion, 10)),
 	})
 	if err != nil {
 		return "", err

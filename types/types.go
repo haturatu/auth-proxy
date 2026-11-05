@@ -49,16 +49,17 @@ const SessionDataContextKey = ContextKey("sessionData")
 
 // User represents a user in the database
 type User struct {
-	ID           int64        `json:"id"`
-	Username     string       `json:"username"`
-	PasswordHash string       `json:"-"`
-	Role         string       `json:"role"`
-	IsActive     bool         `json:"is_active"`
-	LockedUntil  sql.NullTime `json:"locked_until"`
-	FailedLogins int          `json:"failed_logins"`
-	LastLoginAt  sql.NullTime `json:"last_login_at"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
+	CredentialsVersion int64        `json:"-"`
+	ID                 int64        `json:"id"`
+	Username           string       `json:"username"`
+	PasswordHash       string       `json:"-"`
+	Role               string       `json:"role"`
+	IsActive           bool         `json:"is_active"`
+	LockedUntil        sql.NullTime `json:"locked_until"`
+	FailedLogins       int          `json:"failed_logins"`
+	LastLoginAt        sql.NullTime `json:"last_login_at"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
 // AuthToken represents a token in the database

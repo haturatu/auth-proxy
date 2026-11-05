@@ -159,6 +159,10 @@ func createTables() {
 		logging.AppLog.Error("Failed to create users table", "error", err, "db_type", dbType)
 		os.Exit(1)
 	}
+	if err := MigrateIdentity(); err != nil {
+		logging.AppLog.Error("Failed to migrate identity schema", "error", err)
+		os.Exit(1)
+	}
 	logging.AppLog.Info("Users table verified successfully")
 	// MySQL/MariaDB frequently default to a case-insensitive collation.
 	// Match the case-sensitive user lookup semantics of SQLite/PostgreSQL,

@@ -60,12 +60,12 @@ func CreateAuthToken(userID int64, duration time.Duration) (*types.AuthToken, er
 // GetUserByToken retrieves a user associated with a given token.
 // It returns the user if the token is valid and not expired.
 func GetUserByToken(tokenString string) (*types.User, error) {
-	query := database.Rebind("SELECT u.id, u.username, u.password_hash, u.role, u.is_active, u.failed_logins, u.last_login_at, u.created_at, u.updated_at FROM users u JOIN auth_tokens t ON u.id = t.user_id WHERE t.token = ? AND t.expires_at > ?")
+	query := database.Rebind("SELECT u.id, u.username, COALESCE((SELECT password_hash FROM password_credentials WHERE user_id = u.id), ''), u.role, u.is_active, u.failed_logins, u.last_login_at, u.created_at, u.updated_at, u.credentials_version FROM users u JOIN auth_tokens t ON u.id = t.user_id WHERE t.token = ? AND t.expires_at > ?")
 
 	row := database.DB.QueryRow(query, database.TokenHash(tokenString), time.Now())
 
 	user := &types.User{}
-	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.IsActive, &user.FailedLogins, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt, &user.CredentialsVersion)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // Token not found or expired, not a server error
