@@ -4,7 +4,7 @@ set -euo pipefail
 kind=${1:-postgres}
 name="auth-proxy-sso-sql-$kind-$$"
 password=$(openssl rand -hex 24)
-cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
+cleanup() { docker rm -fv "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 case "$kind" in
