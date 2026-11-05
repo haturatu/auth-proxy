@@ -1,5 +1,7 @@
 Security configuration (including direct VLAN access): [SECURITY.md](SECURITY.md).
 
+Passkeys and cross-domain SSO with Nginx: [deployment and migration guide (Japanese)](docs/passkey-sso.ja.md). This opt-in mode adds OIDC Authorization Code Flow with PKCE and independent application sessions.
+
 [日本語](README.ja.md)
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
@@ -75,6 +77,7 @@ Docker Compose supports SQLite (default), PostgreSQL, MySQL and external SQL ser
 ## Features
 
 - **Authentication**: Provides login, logout, and registration pages.
+- **Passkeys and SSO**: Optional WebAuthn authentication and cross-domain SSO through one Nginx gateway and one auth-proxy process.
 - **Reverse Proxy**: Proxies authenticated users to a backend service.
 - **Admin Dashboard**: A simple UI to manage users (update roles, activate/deactivate, delete).
 - **Flexible Database Support**: Works with PostgreSQL, MySQL, and SQLite.
@@ -525,7 +528,7 @@ The base path for these endpoints is `/api/admin/users`, which can be customized
 
 | Environment Variable | Description | Default Value |
 | --- | --- | --- |
-| `TARGET_URL` | **(Required)** The URL of the backend service to proxy to. | - |
+| `TARGET_URL` | The backend service URL. Required unless `SSO_CONFIG` enables the standalone identity provider. | - |
 | `SESSION_SECRET` | **(Required)** Random secret of at least 32 characters; JWT signing uses an HKDF-derived key. | - |
 | `XSRF_SECRET_KEY` | **(Required)** A 32-byte, base64-encoded random key for XSRF protection. Generate with `openssl rand -base64 32`. | - |
 | `DATABASE_URL` | The connection string for PostgreSQL or MySQL. If set, this overrides `DATABASE_PATH`. | - |
@@ -564,7 +567,7 @@ Logout is a state-changing operation: only `POST` is supported, and the browser 
 
 ### Password-change credential revocation
 
-After a successful password change, all stored browser sessions and refresh tokens for that user are revoked atomically with the password update. The caller's session cookie is cleared. Access JWTs are bound to the current password credential state and become invalid on the next authenticated request. Older JWTs lacking `cv` are intentionally rejected; clients must sign in again.
+After a successful password change, all stored browser, SSO and application sessions and refresh tokens for that user are revoked atomically with the password update. The caller's session cookie is cleared. Access JWTs are bound to the user's credential version and become invalid on the next authenticated request. Adding or removing a passkey also changes this version. Access JWTs issued before the credential-version migration must be reissued.
 
 ## Demo
 
