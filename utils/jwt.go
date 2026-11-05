@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"auth-proxy/config"
 	"auth-proxy/types"
 	"crypto/hkdf"
 	"crypto/hmac"
@@ -43,19 +44,22 @@ func jwtAudience() string {
 	if target, err := url.Parse(os.Getenv("TARGET_URL")); err == nil && target.Host != "" {
 		return "auth-proxy:" + target.Host
 	}
+	if config.Paths.SSOIssuer != "" {
+		return "auth-proxy:" + config.Paths.SSOIssuer
+	}
 	return "auth-proxy:local-test"
 }
 
 // credentialTag binds each JWT to the user credential version.
-// The tag is keyed so it reveals nothing about the password hash.
-func credentialTag(key []byte, passwordHash string) string {
+// The keyed tag invalidates all previously issued JWTs after any credential mutation.
+func credentialTag(key []byte, version string) string {
 	h := hmac.New(sha256.New, key)
-	_, _ = h.Write([]byte("auth-proxy/password-credential/v1:"))
-	_, _ = h.Write([]byte(passwordHash))
+	_, _ = h.Write([]byte("auth-proxy/credentials-version/v2:"))
+	_, _ = h.Write([]byte(version))
 	return base64Encode(h.Sum(nil)[:16])
 }
 
-// JWTMatchesCredentials rejects JWTs minted before a password change.
+// JWTMatchesCredentials rejects JWTs minted before a credential version change.
 func JWTMatchesCredentials(payload *types.JWTPayload, user *types.User) bool {
 	if payload == nil || user == nil || payload.CredentialTag == "" {
 		return false

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in · auth-proxy</title><link rel="stylesheet" href="/sso/assets/style.css"><script src="/sso/assets/passkeys.js" defer></script></head>
+<body><main><p class="eyebrow">auth-proxy</p><h1>Sign in</h1><p>Use your passkey to access your applications.</p>
+<button id="passkey-login" type="button">Sign in with a passkey</button>
+<p id="status" role="status" aria-live="polite"></p>
+<details><summary>Sign in with a password</summary><form id="password-login">
+<label for="username">Username</label><input id="username" name="username" autocomplete="username" required>
+<label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Sign in with a password</button></form></details>
+{{if .Register}}<details><summary>Create an account with a passkey</summary><form id="passkey-register">
+<label for="new-username">Username</label><input id="new-username" name="username" autocomplete="username" minlength="3" maxlength="128" required>
+<button type="submit">Create account with a passkey</button></form></details>{{end}}
+</main></body></html>

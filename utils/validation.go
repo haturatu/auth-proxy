@@ -28,7 +28,7 @@ func ValidatePassword(password string) (bool, string) {
 		return validateStrict(password)
 	default:
 		// If an unknown policy is set, default to a safe option (standard).
-		fmt.Printf("Warning: Unknown PASSWORD_POLICY '%s', falling back to 'standard'\n", policy)
+		_, _ = fmt.Fprintf(os.Stderr, "Warning: Unknown PASSWORD_POLICY '%s', falling back to 'standard'\n", policy)
 		return validateStandard(password)
 	}
 }

@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Account · auth-proxy</title><link rel="stylesheet" href="/sso/assets/style.css"><script src="/sso/assets/passkeys.js" defer></script></head>
+<body><main><p class="eyebrow">auth-proxy</p><h1>Your account</h1><p>Signed in as <strong>{{.Username}}</strong>.</p>
+<h2>Passkeys</h2><p>Adding or removing a passkey signs your applications out. Sign in again if your last authentication was more than five minutes ago.</p>
+<ul id="credentials" aria-label="Your passkeys"></ul><button id="add-passkey" type="button">Add a passkey</button>
+<p id="status" role="status" aria-live="polite"></p>
+<a href="/sso/login">Sign in again</a><button id="sso-logout" type="button">Sign out of all applications on this device</button>
+</main></body></html>

@@ -8,6 +8,11 @@ import (
 
 const MaxAuthBodyBytes = 64 << 10
 
+// IsAuthCookie identifies credentials which must never reach an application.
+func IsAuthCookie(name string) bool {
+	return name == "auth_token" || name == "anon_xsrf" || name == "__Host-app_session" || strings.HasPrefix(name, "__Host-sso_")
+}
+
 // LimitAuthBody caps bodies on authentication and administration endpoints, not
 // arbitrary proxied application requests (which may stream large files).
 func LimitAuthBody(next http.Handler) http.Handler {

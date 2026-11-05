@@ -78,4 +78,7 @@ func Init() {
 		AccessTokenDurationMinutes: getEnvAsInt("ACCESS_TOKEN_DURATION_MINUTES", 15),
 		RefreshTokenDurationDays:   getEnvAsInt("REFRESH_TOKEN_DURATION_DAYS", 7),
 	}
+	if c, err := LoadSSO(); err == nil && c != nil {
+		Paths.SSOIssuer = c.Issuer
+	}
 }

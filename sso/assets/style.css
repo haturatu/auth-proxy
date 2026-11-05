@@ -1,0 +1,18 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; padding: 2rem 1rem; background: light-dark(#f4f5f7, #101216); color: light-dark(#17202a, #edf1f5); }
+main { max-width: 30rem; margin: 6vh auto; padding: clamp(1.25rem, 5vw, 2.5rem); border: 1px solid light-dark(#d7dce2, #434c58); border-radius: 1rem; background: light-dark(#fff, #1b2028); }
+h1 { margin-top: .25rem; font-size: 2rem; text-wrap: balance; }
+h2 { font-size: 1.2rem; }
+p { line-height: 1.6; overflow-wrap: anywhere; }
+.eyebrow { font-size: .85rem; letter-spacing: .08em; }
+button, input { font: inherit; font-size: 1rem; box-sizing: border-box; border-radius: .4rem; min-height: 44px; }
+button { width: 100%; padding: .7rem 1rem; border: 1px solid light-dark(#1d4ed8, #729eff); background: light-dark(#1d4ed8, #a5c1ff); color: light-dark(#fff, #101827); cursor: pointer; margin-block: .7rem; }
+button:disabled { opacity: .65; cursor: wait; }
+input { width: 100%; padding: .6rem; border: 1px solid light-dark(#667085, #96a0b0); margin-block: .3rem 1rem; }
+label { display: block; }
+summary { cursor: pointer; padding: .85rem 0; min-height: 24px; }
+details { border-top: 1px solid light-dark(#d7dce2, #434c58); margin-top: 1rem; }
+a { color: light-dark(#1948c0, #a5c1ff); }
+:focus-visible { outline: 3px solid light-dark(#0a67da, #a5c1ff); outline-offset: 4px; }
+#status { min-height: 1.6em; }
+li { margin-block: 1rem; overflow-wrap: anywhere; }

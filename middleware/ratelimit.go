@@ -19,6 +19,16 @@ func NewRateLimiter() *types.RateLimiter {
 	return &types.RateLimiter{Requests: make(map[string][]int64), Max: config.Paths.RateLimitMaxRequests, Window: time.Duration(config.Paths.RateLimitWindowSeconds) * time.Second}
 }
 func RateLimitMiddleware(l *types.RateLimiter) func(http.Handler) http.Handler {
+	return rateLimitMiddleware(l, false)
+}
+
+// RateLimitAllMethods also counts GET authorization requests and DELETE
+// credential mutations without changing the method delivered to the handler.
+func RateLimitAllMethods(l *types.RateLimiter) func(http.Handler) http.Handler {
+	return rateLimitMiddleware(l, true)
+}
+
+func rateLimitMiddleware(l *types.RateLimiter, allMethods bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := logging.GetClientIP(r)
@@ -40,7 +50,7 @@ func RateLimitMiddleware(l *types.RateLimiter) func(http.Handler) http.Handler {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
-			if r.Method == http.MethodPost {
+			if allMethods || r.Method == http.MethodPost {
 				if len(recent) == 0 && len(l.Requests) >= maxRateLimitClients {
 					cleanupRateLimitLocked(l, now)
 				}

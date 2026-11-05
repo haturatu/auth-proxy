@@ -8,6 +8,7 @@ import (
 
 // PathConfig holds the configurable paths for the application routes and assets.
 type PathConfig struct {
+	SSOIssuer string
 	// Paths
 	Login           string
 	Register        string

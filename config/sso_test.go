@@ -25,6 +25,14 @@ func TestSSOConfigRejectsTrustAndRedirectAmbiguity(t *testing.T) {
 			c.Applications[0].Origin = c.Issuer
 			c.Applications[0].RedirectURI = c.Issuer + "/_auth/callback"
 		},
+		"same-cookie-host": func(c *SSOConfig) {
+			c.Applications[0].Origin = c.Issuer + ":8443"
+			c.Applications[0].RedirectURI = c.Applications[0].Origin + "/_auth/callback"
+		},
+		"default-port": func(c *SSOConfig) {
+			c.Applications[0].Origin = "https://app-a.example.com:443"
+			c.Applications[0].RedirectURI = c.Applications[0].Origin + "/_auth/callback"
+		},
 		"duplicate": func(c *SSOConfig) { c.Applications = append(c.Applications, c.Applications[0]) },
 		"empty-acl": func(c *SSOConfig) { c.Applications[0].Roles = nil },
 	} {

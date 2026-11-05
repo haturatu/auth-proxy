@@ -60,6 +60,9 @@ func TestAuthenticatedProxyRebuildsIdentityAndStripsCredentials(t *testing.T) {
 	req.RemoteAddr = "192.168.20.14:5678"
 	req.AddCookie(&http.Cookie{Name: "auth_token", Value: "private-session"})
 	req.AddCookie(&http.Cookie{Name: "anon_xsrf", Value: "private-csrf"})
+	for _, name := range []string{"__Host-sso_session", "__Host-app_session", "__Host-sso_login", "__Host-sso_flow_test"} {
+		req.AddCookie(&http.Cookie{Name: name, Value: "private-credential"})
+	}
 	req.AddCookie(&http.Cookie{Name: "theme", Value: "dark"})
 	req.Header.Set("Authorization", "Bearer client-jwt")
 	req.Header.Set("X-Auth-Request-User", "evil")

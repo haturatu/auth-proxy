@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -31,6 +32,18 @@ type Application struct {
 	// Optional confidential client authentication. Only the environment variable
 	// name is placed in the configuration file.
 	ClientSecretEnv string `yaml:"client_secret_env"`
+}
+
+// SSOPath identifies service-owned namespaces for routing and configuration
+// collision checks. Matching is case insensitive to protect upstream aliases.
+func SSOPath(path string) bool {
+	p := strings.ToLower(path)
+	for _, prefix := range []string{"/internal", "/gateway", "/oauth2", "/webauthn", "/sso", "/.well-known/openid-configuration"} {
+		if p == prefix || strings.HasPrefix(p, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func LoadSSO() (*SSOConfig, error) {
@@ -61,8 +74,16 @@ func LoadSSO() (*SSOConfig, error) {
 
 func originURL(s string) (*url.URL, error) {
 	u, err := url.Parse(s)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery || strings.ContainsAny(s, "*\\\r\n") || strings.ToLower(u.Host) != u.Host {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery || strings.ContainsAny(s, "*?#\\\r\n") || strings.ToLower(u.Host) != u.Host {
 		return nil, fmt.Errorf("expected a canonical HTTPS origin: %q", s)
+	}
+	if port := u.Port(); port != "" {
+		n, err := strconv.Atoi(port)
+		if err != nil || n < 1 || n > 65535 || n == 443 || strconv.Itoa(n) != port {
+			return nil, fmt.Errorf("origin must use a canonical port and omit default port 443")
+		}
+	} else if strings.HasSuffix(u.Host, ":") {
+		return nil, fmt.Errorf("origin must not contain an empty port")
 	}
 	return u, nil
 }
@@ -96,10 +117,13 @@ func (c *SSOConfig) Validate() error {
 		if !regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`).MatchString(a.ID) || ids[a.ID] {
 			return fmt.Errorf("invalid or duplicate application ID %q", a.ID)
 		}
-		if _, err = originURL(a.Origin); err != nil {
+		appURL, err := originURL(a.Origin)
+		if err != nil {
 			return err
 		}
-		if origins[a.Origin] || a.Origin == c.Issuer {
+		// Cookies are scoped by hostname, never by port. Distinct origins on
+		// the same hostname cannot isolate either SSO or app cookies.
+		if origins[appURL.Hostname()] || appURL.Hostname() == u.Hostname() {
 			return fmt.Errorf("application origins must be unique and separate from the issuer")
 		}
 		if a.RedirectURI != a.Origin+"/_auth/callback" {
@@ -116,7 +140,7 @@ func (c *SSOConfig) Validate() error {
 		if a.ClientSecretEnv != "" && len(os.Getenv(a.ClientSecretEnv)) < 32 {
 			return fmt.Errorf("%s client secret must contain at least 32 characters", a.ID)
 		}
-		ids[a.ID], origins[a.Origin] = true, true
+		ids[a.ID], origins[appURL.Hostname()] = true, true
 	}
 	return nil
 }
